@@ -1486,14 +1486,19 @@ class QuadrantFoldingGUI(QMainWindow):
         trans_mat = self.quadFold.centImgTransMat if self.quadFold.centImgTransMat is not None else None  
         orig_size = self.quadFold.origSize if self.quadFold.origSize is not None else None
 
-        self.imageMaskingTool = ImageMaskerWindow(self.filePath, 
-                                                  join(self.filePath, "settings/tempMaskFile.tif"), 
-                                                  self.spminInt.value(), 
-                                                  self.spmaxInt.value(), 
-                                                  max_val, 
+        try:
+            fabio.tifimage.tifimage(data=self.img).write(join(self.filePath, 'settings/tempMaskFile.tif'))
+        except:
+            print("ERROR WITH SAVING THE IMAGE")
+
+        self.imageMaskingTool = ImageMaskerWindow(self.filePath,
+                                                  join(self.filePath, "settings/tempMaskFile.tif"),
+                                                  self.spminInt.value(),
+                                                  self.spmaxInt.value(),
+                                                  max_val,
                                                   orig_size,
-                                                  trans_mat,                                                    
-                                                  rot_ang, 
+                                                  trans_mat,
+                                                  rot_ang,
                                                   isH5)
             
         if self.imageMaskingTool is not None and self.imageMaskingTool.exec_():
@@ -4165,7 +4170,7 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.numberOfFiles > 0:
             self.currentFileNumber = (self.currentFileNumber - 1) % self.numberOfFiles
 
-            self.quadFold = QuadrantFolder(self.filePath, self.fileList[self.currentFileNumber], self, self.fileList, self.ext)            
+            self.quadFold = QuadrantFolder(self.filePath, self.imgList[self.currentFileNumber], self, self.fileList, self.ext)            
             self.quadFold.info = {}
             
             if self.calSettingsDialog.fixedCenter.isChecked():
@@ -4185,7 +4190,7 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.numberOfFiles > 0:
             self.currentFileNumber = (self.currentFileNumber + 1) % self.numberOfFiles
 
-            self.quadFold = QuadrantFolder(self.filePath, self.fileList[self.currentFileNumber], self, self.fileList, self.ext)
+            self.quadFold = QuadrantFolder(self.filePath, self.imgList[self.currentFileNumber], self, self.fileList, self.ext)
             self.quadFold.info = {}
 
             if self.calSettingsDialog.fixedCenter.isChecked():
