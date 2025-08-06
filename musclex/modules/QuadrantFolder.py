@@ -189,7 +189,7 @@ class QuadrantFolder:
         sigmoid - merging gradient
         other backgound subtraction params - cirmin, cirmax, nbins, tophat1, tophat2
         """
-        print(str(self.img_name) + " is being processed...") 
+        print(str(self.img_name) + " is being processed...")
 
         self.updateInfo(flags)
         self.initParams()
@@ -217,9 +217,9 @@ class QuadrantFolder:
 
             self.info['avg_fold'] = top_left
 
-            
+
             #self.initImg = self.orig_img
-            
+
             # if self.initImg is not None:
             #     self.info['avg_fold'] = self.initImg
             # else:
@@ -464,9 +464,9 @@ class QuadrantFolder:
         M1  = np.array([[scale, 0,         tx],
                         [0,         scale, ty]],
                     dtype=np.float32)
-        
+
         self.centImgTransMat = M1
-        
+
         cent_img = cv2.warpAffine(self.orig_img, M1, (w_o, h_o))
 
         M2 = cv2.getRotationMatrix2D(
@@ -525,7 +525,7 @@ class QuadrantFolder:
             new_img[0:b,0:l] = img
         except:
             print("Centerize Image : Dimension mismatched. Please report error and the steps leading up to it.")
-        
+
 
         #Translate image to appropriate position
         transx = int(((dim/2) - center[0]))
@@ -572,14 +572,14 @@ class QuadrantFolder:
         # Cropping off the surrounding part since we had already expanded the image to maximum possible extent in centerize image
         hnew, wnew = rotImg.shape
         dh, dw = (hnew - h)//2, (wnew-w)//2
-        final_rotImg = rotImg[dh:hnew-dh, dw:wnew-dw]
+        final_rotImg = rotImg[dh:h + dh, dw:w + dw]
         if self.fixedCenterX is None and self.fixedCenterY is None:
             self.info["center"] = (newCenter[0]-dw, newCenter[1]-dh)
         self.dl, self.db = dw, dh # storing the cropped off section to recalculate coordinates when manual center is given
 
         self.curr_dims = final_rotImg.shape
         return final_rotImg
-    
+
 
     def getFoldNumber(self, x, y):
         """
@@ -776,17 +776,17 @@ class QuadrantFolder:
 
         # Call the new background subtraction function
         background = replicate_bgcsym2(
-            AD=ad, 
-            width=width, 
-            height=height, 
-            dmin=rmin, 
-            dmax=rmax, 
-            xc=width / 2.0 - 0.5, 
-            yc=height / 2.0 - 0.5, 
-            bin_size=bin_size, 
-            smooth=smoo, 
-            tension=tension, 
-            pc1=pc1, 
+            AD=ad,
+            width=width,
+            height=height,
+            dmin=rmin,
+            dmax=rmax,
+            xc=width / 2.0 - 0.5,
+            yc=height / 2.0 - 0.5,
+            bin_size=bin_size,
+            smooth=smoo,
+            tension=tension,
+            pc1=pc1,
             pc2=pc2
         )
 
@@ -887,7 +887,7 @@ class QuadrantFolder:
         #--------------------------------NEW ROVING WINDOW BG SUB--------------------------------
 
         fold = np.copy(self.info["avg_fold"])
-        
+
         img = self.makeFullImage(fold)
         center = self.info["center"]
 
@@ -900,7 +900,7 @@ class QuadrantFolder:
         img = img.astype("float32")
         width = img.shape[1]
         height = img.shape[0]
-       
+
 
         # Prepare options and parameter values based on 'typ'
         if typ == "gauss":
@@ -941,7 +941,7 @@ class QuadrantFolder:
             pad_y = max((fold.shape[0] - background.shape[0]), 0)
             pad_x = max((fold.shape[1] - background.shape[1]), 0)
             background = np.pad(background, ((pad_y, 0), (pad_x, 0)), 'constant', constant_values=0)
-        else: 
+        else:
             background = background[:fold.shape[0], :fold.shape[1]]
         result = np.array(fold - background, dtype=np.float32)
 
@@ -1041,7 +1041,7 @@ class QuadrantFolder:
             smoo = self.info["smooth2"]
             tension = self.info["tension2"]
             pc1 = self.info["cirmin2"] / 100.0
-            pc2 = self.info["cirmax2"] / 100.0       
+            pc2 = self.info["cirmax2"] / 100.0
         else:
             iwid = self.info["win_size_x"]
             jwid = self.info["win_size_y"]
@@ -1067,16 +1067,16 @@ class QuadrantFolder:
         # Call the replicate_bgwsrt2 function
         b = replicate_bgwsrt2(buf, b, iwid, jwid, isep, jsep, smoo, tension, pc1, pc2, width, height, maxdim, maxwin, xb, yb, ys, ysp, wrk, bw, index_bn, 0, 6)
         b= b.reshape((height, width))
-      
+
         if "roi_rad" in self.info:
             b = b[:height//2, :width//2]
             pad_y = max((fold.shape[0] - b.shape[0]), 0)
             pad_x = max((fold.shape[1] - b.shape[1]), 0)
             b = np.pad(b, ((pad_y, 0), (pad_x, 0)), 'constant', constant_values=0)
 
-        else: 
+        else:
             b = b[:fold.shape[0], :fold.shape[1]]
-      
+
         result = np.array(fold - b, dtype=np.float32)
         result = qfu.replaceRmin(result, int(self.info["rmin"]), 0.0)
 
@@ -1199,7 +1199,7 @@ class QuadrantFolder:
         integration_method = IntegrationMethod.select_one_available("csr", dim=1, default="csr", degradable=True)
         step = 1 if step not in [0.5, 1, 2, 3, 5, 9, 10, 15, 18] else step
         for deg in np.arange(180, 270 + step, step):
-            
+
             if deg == 180 :
                 start_deg = 180
                 end_deg = 180 + step/2
@@ -1381,7 +1381,7 @@ class QuadrantFolder:
             center = [img1.shape[1]-1, img1.shape[0]-1]
             rad = self.info["transition_radius"]
             delta = self.info["transition_delta"]
-            
+
             # Merge 2 images at merge radius using transition radius and delta
             self.imgCache['BgSubFold'] = qfu.combine_bgsub_linear_float32(img1, img2, center[0], center[1], rad, delta)
 
@@ -1404,13 +1404,13 @@ class QuadrantFolder:
             center = result.shape[0]/2, result.shape[1]/2
             rad = self.info['roi_rad']
             result = result[max(int(center[1]-rad), 0):min(int(center[1]+rad), result.shape[1]), max(int(center[0]-rad), 0):min(int(center[0]+rad), result.shape[0])]
-        
+
         scale = 1 if 'scale' not in self.info else self.info['scale']
-        
+
         h, w = result.shape
         center = (w//2, h//2)
         M = cv2.getRotationMatrix2D(center, 0, 1/scale)
-        
+
         result_scaled = cv2.warpAffine(result, M, (w, h))
 
         self.imgCache['resultImg'] = result_scaled
