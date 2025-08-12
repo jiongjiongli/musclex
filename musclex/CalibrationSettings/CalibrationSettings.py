@@ -210,7 +210,7 @@ class CalibrationSettings(QDialog):
         self.editableVars[self.pixsSpnBx.objectName()] = None
 
 
-        self.fixedCenter = QCheckBox("Fixed Center")
+        # self.fixedCenter = QCheckBox("Fixed Center")
         self.centerX = QDoubleSpinBox()
         self.centerX.setDecimals(2)
         self.centerX.setPrefix("X:")
@@ -232,7 +232,7 @@ class CalibrationSettings(QDialog):
             self.centerX.setValue(1000)
             self.centerY.setValue(1000)
 
-        self.fixedCenter.setChecked(False)
+        # self.fixedCenter.setChecked(False)
         #self.centerX.setEnabled(False)
         #self.centerY.setEnabled(False)
         self.centerX.setObjectName('centerX')
@@ -269,7 +269,8 @@ class CalibrationSettings(QDialog):
         self.mainLayout.addWidget(self.calImageGrp)
         self.mainLayout.addWidget(self.paramGrpChkBx)
         self.mainLayout.addWidget(self.paramGrp)
-        self.mainLayout.addWidget(self.fixedCenter)
+        # self.mainLayout.addWidget(self.fixedCenter)
+        self.mainLayout.addWidget(QLabel("Calibrated Center (can be set manually):"))
         self.mainLayout.addWidget(self.centerX)
         self.mainLayout.addWidget(self.centerY)
         self.mainLayout.addWidget(self.manDetector)
@@ -296,7 +297,7 @@ class CalibrationSettings(QDialog):
         #self.calImageGrp.clicked.connect(self.calImageChecked)
         self.minInt.valueChanged.connect(self.updateImage)
         self.maxInt.valueChanged.connect(self.updateImage)
-        self.fixedCenter.stateChanged.connect(self.centerFixed)
+        # self.fixedCenter.stateChanged.connect(self.centerFixed)
         self.manDetector.stateChanged.connect(self.detectorClicked)
         self.misSettingChkBx.stateChanged.connect(self.correctMisSetting)
 
@@ -388,7 +389,7 @@ class CalibrationSettings(QDialog):
                 self.manualCal.setText("Set calibration by points selections")
                 self.calibrate()
                 self.manualCalPoints = None
-                self.fixedCenter.setChecked(False)
+                # self.fixedCenter.setChecked(False)
 
                 #Let them change this again:
                 self.maxInt.setEnabled(True)
@@ -516,8 +517,8 @@ class CalibrationSettings(QDialog):
             self.calSettings["silverB"] = self.silverBehenate.value()
             self.calSettings["type"] = "img"
 
-        if self.fixedCenter.isChecked():
-            self.calSettings["center"] = [self.centerX.value(), self.centerY.value()]
+        # if self.fixedCenter.isChecked():
+        self.calSettings["center"] = [self.centerX.value(), self.centerY.value()]
 
         if self.manDetector.isChecked():
             self.calSettings["detector"] = self.detectorChoice.currentText()
@@ -636,7 +637,7 @@ class CalibrationSettings(QDialog):
         if self.calSettings is not None:
             if "center" in self.calSettings:
                 center = self.calSettings["center"]
-                self.fixedCenter.setChecked(True)
+                # self.fixedCenter.setChecked(True)
                 self.centerX.setValue(center[0])
                 self.centerY.setValue(center[1])
             if self.calImageGrpChkBox.isChecked():

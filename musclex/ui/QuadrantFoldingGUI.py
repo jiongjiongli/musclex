@@ -417,8 +417,20 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setRotationButton.setCheckable(True)
         self.checkableButtons.append(self.setRotationButton)
 
-        self.persistRotations = QCheckBox("Persist Rotations")
-        self.persistRotations.setVisible(False)
+        self.image_center = QLineEdit()
+        self.image_center.setText("Not set")
+        self.image_center.setReadOnly(True)
+
+        self.persistCenter = QCheckBox("Persist Center")
+        self.persistCenter.setEnabled(False)
+
+        self.rotationSpnBx = QSpinBox()
+        self.rotationSpnBx.setRange(0, 180)
+        self.rotationSpnBx.setValue(0)
+        self.rotationSpnBx.setKeyboardTracking(False)
+
+        self.persistRotations = QCheckBox("Persist Rotation")
+        # self.persistRotations.setVisible(False)
 
         self.maskThresSpnBx = QDoubleSpinBox()
         self.maskThresSpnBx.setMinimum(-999)
@@ -453,22 +465,37 @@ class QuadrantFoldingGUI(QMainWindow):
         self.fixedOrientationChkBx = QCheckBox("Persistent Orientation")
         self.fixedOrientationChkBx.setChecked(False)
 
-        self.settingsLayout.addWidget(self.calibrationButton, 0, 0, 1, 4)
-        self.settingsLayout.addWidget(self.setCentByChords, 1, 0, 1, 2)
-        self.settingsLayout.addWidget(self.setCentByPerp, 1, 2, 1, 2)
-        self.settingsLayout.addWidget(self.setCenterRotationButton, 2, 0, 1, 2)
-        self.settingsLayout.addWidget(self.setRotationButton, 2, 2, 1, 2)
-        self.settingsLayout.addWidget(self.persistRotations, 3, 0, 1, 4)
+        row_index = 0
+        self.settingsLayout.addWidget(self.calibrationButton, row_index, 0, 1, 4)
+        row_index += 1
+        self.settingsLayout.addWidget(self.setCentByChords, row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.setCentByPerp, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(self.setCenterRotationButton, row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.setRotationButton, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(QLabel("Image Center (Pixel, Readonly): "), row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.image_center, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(self.persistCenter, row_index, 0, 1, 4)
+        row_index += 1
+        self.settingsLayout.addWidget(QLabel("Rotation Angle (Degree): "), row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.rotationSpnBx, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(self.persistRotations, row_index, 0, 1, 4)
         #self.settingsLayout.addWidget(QLabel("Lower Bound : "), 4, 0, 1, 2)
         #self.settingsLayout.addWidget(self.minThreshField, 4, 2, 1, 2)
         #self.settingsLayout.addWidget(QLabel("Upper Bound : "), 5, 0, 1, 2)
         #self.settingsLayout.addWidget(self.maxThreshField, 5, 2, 1, 2)
-        self.settingsLayout.addWidget(QLabel("Mask Threshold : "), 6, 0, 1, 2)
-        self.settingsLayout.addWidget(self.maskThresSpnBx, 6, 2, 1, 2)
-        self.settingsLayout.addWidget(QLabel("Orientation Finding: "), 7, 0, 1, 2)
-        self.settingsLayout.addWidget(self.orientationCmbBx, 7, 2, 1, 2)
-        self.settingsLayout.addWidget(self.modeAngleChkBx, 8, 0, 1, 4)
-        self.settingsLayout.addWidget(self.fixedOrientationChkBx, 8, 2, 1, 4)
+        row_index += 1
+        self.settingsLayout.addWidget(QLabel("Mask Threshold : "), row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.maskThresSpnBx, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(QLabel("Orientation Finding: "), row_index, 0, 1, 2)
+        self.settingsLayout.addWidget(self.orientationCmbBx, row_index, 2, 1, 2)
+        row_index += 1
+        self.settingsLayout.addWidget(self.modeAngleChkBx, row_index, 0, 1, 4)
+        self.settingsLayout.addWidget(self.fixedOrientationChkBx, row_index, 2, 1, 4)
 
 
         self.settingsLayout.addWidget(self.toggleFoldImage, 14, 0, 1, 4)
@@ -1839,18 +1866,18 @@ class QuadrantFoldingGUI(QMainWindow):
                 self.calSettings = self.calSettingsDialog.getValues()
 
                 if self.calSettings is not None:
-                    if self.calSettingsDialog.fixedCenter.isChecked():
+                    if 'center' in self.calSettings:
                         self.quadFold.info['calib_center'] = self.calSettings['center']
-                        self.setCenterRotationButton.setEnabled(False)
-                        self.setCenterRotationButton.setToolTip(
-                            "Please uncheck fixed center in calibration settings first")
+                        # self.setCenterRotationButton.setEnabled(False)
+                        # self.setCenterRotationButton.setToolTip(
+                        #     "Please uncheck fixed center in calibration settings first")
                         if 'manual_center' in self.quadFold.info:
                             del self.quadFold.info['manual_center']
                         if 'center' in self.quadFold.info:
                             del self.quadFold.info['center']
                     else:
-                        self.setCenterRotationButton.setEnabled(True)
-                        self.setCenterRotationButton.setToolTip("")
+                        # self.setCenterRotationButton.setEnabled(True)
+                        # self.setCenterRotationButton.setToolTip("")
                         if self.quadFold is not None and 'calib_center' in self.quadFold.info:
                             del self.quadFold.info['calib_center']
                         if self.quadFold is not None and 'center' in self.quadFold.info:
@@ -3183,7 +3210,7 @@ class QuadrantFoldingGUI(QMainWindow):
         if 'center' in currentInfo:
             del currentInfo['center']
 
-        if self.calSettingsDialog.fixedCenter.isChecked() and prevInfo is not None and 'calib_center' in prevInfo:
+        if self.persistCenter.isChecked() and prevInfo is not None and 'calib_center' in prevInfo:
             currentInfo['calib_center'] = prevInfo['calib_center']
             if 'manual_center' in currentInfo:
                 del currentInfo['manual_center']
@@ -3456,7 +3483,7 @@ class QuadrantFoldingGUI(QMainWindow):
             # self.quadFold.expandImg = 2.8 if self.expandImage.isChecked() else 1
             # quadFold_copy = copy.copy(self.quadFold)
             try:
-                if self.calSettingsDialog.fixedCenter.isChecked() and self.calSettings is not None and 'center' in self.calSettings:
+                if self.persistCenter.isChecked() and self.calSettings is not None and 'center' in self.calSettings:
                     self.quadFold.fixedCenterX, self.quadFold.fixedCenterY = self.calSettings['center']
                 self.quadFold.process(flags)
             except Exception:
@@ -3543,7 +3570,7 @@ class QuadrantFoldingGUI(QMainWindow):
         bg_csv_lock = Lock()
         while not self.tasksQueue.empty() and self.threadPool.activeThreadCount() < self.threadPool.maxThreadCount() / 2:
             params = self.tasksQueue.get()
-            self.currentTask = Worker(params, self.calSettingsDialog.fixedCenter.isChecked(),
+            self.currentTask = Worker(params, self.persistCenter.isChecked(),
                                       self.persistedCenter, self.persistedRotation, self.bgChoiceIn.currentText(),
                                       bgDict=self.bgAsyncDict, bg_lock=bg_csv_lock)
             self.currentTask.signals.result.connect(self.thread_done)
@@ -3978,7 +4005,7 @@ class QuadrantFoldingGUI(QMainWindow):
         #Print message
         #store the current center in the quadfoldgui object
         #Display Center on popup window
-        if self.calSettingsDialog.fixedCenter.isChecked() and self.calSettings['center'] is not None:
+        if self.persistCenter.isChecked() and self.calSettings['center'] is not None:
             print("USING PERSISTED CENTER")
             self.persistedCenter = self.calSettings['center']
             text += "\n  - Center : " + str(self.persistedCenter)
@@ -4206,7 +4233,7 @@ class QuadrantFoldingGUI(QMainWindow):
             self.quadFold = QuadrantFolder(self.filePath, self.imgList[self.currentFileNumber], self, self.fileList, self.ext)
             self.quadFold.info = {}
 
-            if self.calSettingsDialog.fixedCenter.isChecked():
+            if self.persistCenter.isChecked():
                 if self.persistedCenter is None:
                     self.persistedCenter = self.calSettings['center']
                 self.quadFold.info['manual_center'] = [self.persistedCenter[0], self.persistedCenter[1]] #Name should be changed to 'fixed center or something separate from manual in theory but this works.
@@ -4226,7 +4253,7 @@ class QuadrantFoldingGUI(QMainWindow):
             self.quadFold = QuadrantFolder(self.filePath, self.imgList[self.currentFileNumber], self, self.fileList, self.ext)
             self.quadFold.info = {}
 
-            if self.calSettingsDialog.fixedCenter.isChecked():
+            if self.persistCenter.isChecked():
                 if self.persistedCenter is None:
                     self.persistedCenter = self.calSettings['center']
                 self.quadFold.info['manual_center'] = [self.persistedCenter[0], self.persistedCenter[1]] #Name should be changed to 'fixed center or something separate from manual in theory but this works.
