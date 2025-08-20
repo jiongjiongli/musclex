@@ -103,6 +103,9 @@ class QuadrantFolder:
         else:
             self.info = {}
 
+        self.info.setdefault("center_history", [])
+        self.info.setdefault("angle_history", [])
+
         #Nick Allison
         #Used for persistirng the center when processing a folder of images that
         #need to have the same center.
@@ -178,6 +181,24 @@ class QuadrantFolder:
         except:
             print("Ran into some problem reading from mask file.")
             return -1.0, -1.0
+
+    def get_latest_center(self):
+        center_history = self.get("center_history")
+
+        if center_history:
+            latest_center_info = center_history[-1]
+            return latest_center_info["center"]
+
+        return None
+
+    def add_center(self, center, source):
+        center_info = {
+            "center": center,
+            "source": source,
+        }
+
+        self.info.setdefault("center_history", [])
+        self.info["center_history"].append(center_info)
 
     def process(self, flags):
         """
@@ -429,29 +450,31 @@ class QuadrantFolder:
         orig_x, orig_y = w_o//2, h_o//2
         x, y = self.info['center']
 
-        corners = [
-            (-x,      -y),
-            ( w_o - x,  -y),
-            ( w_o - x,   h_o - y),
-            (-x,       h_o - y)
-        ]
+        # corners = [
+        #     (-x,      -y),
+        #     ( w_o - x,  -y),
+        #     ( w_o - x,   h_o - y),
+        #     (-x,       h_o - y)
+        # ]
 
         angle = self.info['rotationAngle']
 
-        cos, sin = math.cos(angle * math.pi / 180), math.sin(angle * math.pi / 180)
+        # cos, sin = math.cos(angle * math.pi / 180), math.sin(angle * math.pi / 180)
 
-        rot_pts = [
-            (cx * cos - cy * sin, cx * sin + cy * cos)
-            for cx, cy in corners
-        ]
+        # rot_pts = [
+        #     (cx * cos - cy * sin, cx * sin + cy * cos)
+        #     for cx, cy in corners
+        # ]
 
 
-        max_rx = max([abs(x) for x, y in rot_pts])
-        max_ry = max([abs(y) for x, y in rot_pts])
+        # max_rx = max([abs(x) for x, y in rot_pts])
+        # max_ry = max([abs(y) for x, y in rot_pts])
 
 
         # fit‐to‐frame scale (never upscale beyond 1.0)
-        scale = min((w_o/2) / max_rx, (h_o/2) / max_ry, 1.0)
+        # jiongjiong: Disable scale.
+        # scale = min((w_o/2) / max_rx, (h_o/2) / max_ry, 1.0)
+        scale = 1.0
 
         self.info['scale'] = scale
 
@@ -477,7 +500,7 @@ class QuadrantFolder:
 
         self.orig_img = cv2.warpAffine(cent_img, M2, (w_o, h_o))
 
-        new_center = [x - (tx * cos - ty * sin), y - (tx * sin + ty * cos)]
+        # new_center = [x - (tx * cos - ty * sin), y - (tx * sin + ty * cos)]
 
         self.old_center = self.info['center']
         #self.info['center'] = new_center

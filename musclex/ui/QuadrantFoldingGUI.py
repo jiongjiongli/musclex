@@ -403,23 +403,27 @@ class QuadrantFoldingGUI(QMainWindow):
         #self.settingsGroup.setFixedHeight(300)
         #self.settingsGroup.setMinimumSize(400, 200)
 
-        self.calibrationButton = QPushButton("Calibration Settings")
-        self.setCenterRotationButton = QPushButton("Set Rotation Angle and Center")
-        self.setCenterRotationButton.setCheckable(True)
+        self.centerGroup = QGroupBox("Set Center")
+        self.centerLayout = QGridLayout(self.centerGroup)
+        self.calibrationButton = QPushButton("Set Center by Calibration")
+        self.setCenterRotationButton = QPushButton("Set Center and Rotation Angle")
+        self.setCenterRotationButton.setCheckable(False)
         self.checkableButtons.append(self.setCenterRotationButton)
         self.setCentByChords = QPushButton("Set Center by Chords")
-        self.setCentByChords.setCheckable(True)
+        self.setCentByChords.setCheckable(False)
         self.checkableButtons.append(self.setCentByChords)
         self.setCentByPerp = QPushButton("Set Center by Perpendiculars")
-        self.setCentByPerp.setCheckable(True)
+        self.setCentByPerp.setCheckable(False)
         self.checkableButtons.append(self.setCentByPerp)
-        self.setRotationButton = QPushButton("Set Rotation Angle")
-        self.setRotationButton.setCheckable(True)
+
+        self.rotationAngleGroup = QGroupBox("Set Rotation Angle")
+        self.rotationAngleLayout = QGridLayout(self.rotationAngleGroup)
+        self.setRotationButton = QPushButton("Set Angle by Ray from Center")
+        self.setRotationButton.setCheckable(False)
         self.checkableButtons.append(self.setRotationButton)
 
         self.image_center = QLineEdit()
-        self.image_center.setText("Not set")
-        self.image_center.setReadOnly(True)
+        self.image_center.setEnabled(False)
 
         self.persistCenter = QCheckBox("Persist Center")
         self.persistCenter.setEnabled(False)
@@ -428,9 +432,11 @@ class QuadrantFoldingGUI(QMainWindow):
         self.rotationSpnBx.setRange(0, 180)
         self.rotationSpnBx.setValue(0)
         self.rotationSpnBx.setKeyboardTracking(False)
+        self.rotationSpnBx.setEnabled(False)
 
-        self.persistRotations = QCheckBox("Persist Rotation")
-        # self.persistRotations.setVisible(False)
+        self.persistRotation = QCheckBox("Persist Rotation")
+        self.persistRotation.setEnabled(False)
+        # self.persistRotation.setVisible(False)
 
         self.maskThresSpnBx = QDoubleSpinBox()
         self.maskThresSpnBx.setMinimum(-999)
@@ -465,29 +471,35 @@ class QuadrantFoldingGUI(QMainWindow):
         self.fixedOrientationChkBx = QCheckBox("Persistent Orientation")
         self.fixedOrientationChkBx.setChecked(False)
 
+        center_layout_row_index = 0
+        self.centerLayout.addWidget(self.calibrationButton, center_layout_row_index, 0, 1, 4)
+        center_layout_row_index += 1
+        self.centerLayout.addWidget(self.setCentByChords, center_layout_row_index, 0, 1, 2)
+        self.centerLayout.addWidget(self.setCentByPerp, center_layout_row_index, 2, 1, 2)
+        center_layout_row_index += 1
+        self.centerLayout.addWidget(QLabel("Image Center (Pixel): "), center_layout_row_index, 0, 1, 2)
+        self.centerLayout.addWidget(self.image_center, center_layout_row_index, 2, 1, 2)
+        center_layout_row_index += 1
+        self.centerLayout.addWidget(self.persistCenter, center_layout_row_index, 0, 1, 4)
+        center_layout_row_index += 1
+
+        rotation_angle_row_index = 0
+        self.rotationAngleLayout.addWidget(self.setRotationButton, rotation_angle_row_index, 0, 1, 2)
+        rotation_angle_row_index += 1
+        self.rotationAngleLayout.addWidget(QLabel("Rotation Angle (Degree): "), rotation_angle_row_index, 0, 1, 2)
+        self.rotationAngleLayout.addWidget(self.rotationSpnBx, rotation_angle_row_index, 2, 1, 2)
+        rotation_angle_row_index += 1
+        self.rotationAngleLayout.addWidget(self.persistRotation, rotation_angle_row_index, 0, 1, 4)
+        rotation_angle_row_index += 1
+
         row_index = 0
-        self.settingsLayout.addWidget(self.calibrationButton, row_index, 0, 1, 4)
-        row_index += 1
-        self.settingsLayout.addWidget(self.setCentByChords, row_index, 0, 1, 2)
-        self.settingsLayout.addWidget(self.setCentByPerp, row_index, 2, 1, 2)
-        row_index += 1
         self.settingsLayout.addWidget(self.setCenterRotationButton, row_index, 0, 1, 2)
-        self.settingsLayout.addWidget(self.setRotationButton, row_index, 2, 1, 2)
         row_index += 1
-        self.settingsLayout.addWidget(QLabel("Image Center (Pixel, Readonly): "), row_index, 0, 1, 2)
-        self.settingsLayout.addWidget(self.image_center, row_index, 2, 1, 2)
-        row_index += 1
-        self.settingsLayout.addWidget(self.persistCenter, row_index, 0, 1, 4)
-        row_index += 1
-        self.settingsLayout.addWidget(QLabel("Rotation Angle (Degree): "), row_index, 0, 1, 2)
-        self.settingsLayout.addWidget(self.rotationSpnBx, row_index, 2, 1, 2)
-        row_index += 1
-        self.settingsLayout.addWidget(self.persistRotations, row_index, 0, 1, 4)
         #self.settingsLayout.addWidget(QLabel("Lower Bound : "), 4, 0, 1, 2)
         #self.settingsLayout.addWidget(self.minThreshField, 4, 2, 1, 2)
         #self.settingsLayout.addWidget(QLabel("Upper Bound : "), 5, 0, 1, 2)
         #self.settingsLayout.addWidget(self.maxThreshField, 5, 2, 1, 2)
-        row_index += 1
+
         self.settingsLayout.addWidget(QLabel("Mask Threshold : "), row_index, 0, 1, 2)
         self.settingsLayout.addWidget(self.maskThresSpnBx, row_index, 2, 1, 2)
         row_index += 1
@@ -981,6 +993,10 @@ class QuadrantFoldingGUI(QMainWindow):
         self.optionsLayout.addSpacing(10)
         self.optionsLayout.addWidget(self.blankImageGrp)
         self.optionsLayout.addSpacing(10)
+        self.optionsLayout.addWidget(self.centerGroup)
+        self.optionsLayout.addSpacing(10)
+        self.optionsLayout.addWidget(self.rotationAngleGroup)
+        self.optionsLayout.addSpacing(10)
         self.optionsLayout.addWidget(self.settingsGroup)
 
         self.optionsLayout.addStretch()
@@ -1231,7 +1247,7 @@ class QuadrantFoldingGUI(QMainWindow):
         self.imageFigure.canvas.mpl_connect('button_release_event', self.imageReleased)
         self.imageFigure.canvas.mpl_connect('scroll_event', self.imgScrolled)
 
-        self.persistRotations.stateChanged.connect(self.persistRotationsChecked)
+        self.persistRotation.stateChanged.connect(self.persistRotationChecked)
 
         ##### Result Tab #####
         self.rotate90Chkbx.stateChanged.connect(self.processImage)
@@ -1312,8 +1328,8 @@ class QuadrantFoldingGUI(QMainWindow):
             self.leftWidget.setMinimumWidth(650)
 
 
-    def persistRotationsChecked(self):
-        if self.persistRotations.isChecked():
+    def persistRotationChecked(self):
+        if self.persistRotation.isChecked():
             self.rotationAngle = self.quadFold.info['rotationAngle']
 
     def cropFoldedImageChanged(self):
@@ -1867,6 +1883,8 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 if self.calSettings is not None:
                     if 'center' in self.calSettings:
+                        self.quadFold.add_center(self.calSettings['center'], "calibration")
+
                         self.quadFold.info['calib_center'] = self.calSettings['center']
                         # self.setCenterRotationButton.setEnabled(False)
                         # self.setCenterRotationButton.setToolTip(
@@ -2100,7 +2118,7 @@ class QuadrantFoldingGUI(QMainWindow):
                     self.deleteInfo(['avg_fold'])
                     self.newImgDimension = None
                     self.setCenterRotationButton.setChecked(False)
-                    self.persistRotations.setVisible(True)
+                    self.persistRotation.setVisible(True)
                     self.processImage()
             elif func[0] == "im_rotate":
                 # set rotation angle
@@ -2134,7 +2152,7 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 self.deleteInfo(['avg_fold'])
                 self.setRotationButton.setChecked(False)
-                self.persistRotations.setVisible(True)
+                self.persistRotation.setVisible(True)
 
                 #Put the center (in original image coordinates) into the manual center entry of the key so that it will be used during processing.
                 self.quadFold.info['manual_center'] = (int(round(cx_o)), int(round(cy_o)))
@@ -3163,7 +3181,7 @@ class QuadrantFoldingGUI(QMainWindow):
             if self.quadFold.info['folded'] != self.toggleFoldImage.isChecked():
                 self.quadFold.deleteFromDict(self.quadFold.info, 'avg_fold')
                 self.quadFold.deleteFromDict(self.quadFold.imgCache, 'BgSubFold')
-        if self.persistRotations.isChecked():
+        if self.persistRotation.isChecked():
             self.quadFold.info['manual_rotationAngle'] = self.rotationAngle
         self.processImage()
 
@@ -3374,6 +3392,13 @@ class QuadrantFoldingGUI(QMainWindow):
         """
         if self.quadFold is None:
             return [0,0], (0,0)
+
+        if self.quadFold is not None:
+            latest_center = self.quadFold.get_latest_center()
+
+            if latest_center:
+                return [0, 0], latest_center
+
         if self.quadFold.orig_image_center is None and (self.quadFold.fixedCenterX is None or self.quadFold.fixedCenterY is None):
             self.quadFold.findCenter()
             self.statusPrint("Done.")
@@ -3862,6 +3887,12 @@ class QuadrantFoldingGUI(QMainWindow):
                 self.selectFolder.setHidden(True)
                 self.imageCanvas.setHidden(False)
                 self.updateLeftWidgetWidth()
+
+                self.setCentByChords.setCheckable(True)
+                self.setCentByPerp.setCheckable(True)
+                self.setCenterRotationButton.setCheckable(True)
+                self.setRotationButton.setCheckable(True)
+
                 self.resetWidgets()
                 QApplication.restoreOverrideCursor()
                 if self.h5List == []:

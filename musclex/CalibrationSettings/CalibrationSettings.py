@@ -270,7 +270,7 @@ class CalibrationSettings(QDialog):
         self.mainLayout.addWidget(self.paramGrpChkBx)
         self.mainLayout.addWidget(self.paramGrp)
         # self.mainLayout.addWidget(self.fixedCenter)
-        self.mainLayout.addWidget(QLabel("Calibrated Center (can be set manually):"))
+        self.mainLayout.addWidget(QLabel("Calibrated Center:"))
         self.mainLayout.addWidget(self.centerX)
         self.mainLayout.addWidget(self.centerY)
         self.mainLayout.addWidget(self.manDetector)

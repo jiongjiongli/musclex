@@ -10,3 +10,5 @@ musclex/tests/qf/*
 
 # Pycharm
 .idea/
+
+.DS_Store
