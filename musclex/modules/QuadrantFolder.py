@@ -105,6 +105,7 @@ class QuadrantFolder:
 
         self.info.setdefault("center_history", [])
         self.info.setdefault("angle_history", [])
+        self.info.setdefault("transform", None)
 
         #Nick Allison
         #Used for persistirng the center when processing a folder of images that
@@ -199,6 +200,27 @@ class QuadrantFolder:
 
         self.info.setdefault("center_history", [])
         self.info["center_history"].append(center_info)
+
+    def add_transform(self, M):
+        prev_transform = self.info.get("transform")
+
+        if prev_transform:
+            self.info["transform"] = self.merge_warps((prev_transform, M))
+        else:
+            self.info["transform"] = M
+
+    def merge_warps(warps):
+        M_total = np.eye(3, dtype=np.float32)
+
+        for W in warps:
+            # Convert 2x3 -> 3x3
+            W_h = np.vstack([W, [0, 0, 1]])
+            # Multiply (note: last one in list applies last)
+            M_total = W_h @ M_total
+
+        # Convert back to 2x3
+        M = M_total[:2, :]
+        return M
 
     def process(self, flags):
         """
@@ -329,6 +351,12 @@ class QuadrantFolder:
 
         if 'mask_thres' not in self.info:
             self.info['mask_thres'] = getMaskThreshold(self.orig_img)
+
+        center = self.get_latest_center()
+        if center:
+            self.info['center'] = center
+            return
+
         if 'center' in self.info:
             self.centerChanged = False
             return
@@ -489,8 +517,9 @@ class QuadrantFolder:
                     dtype=np.float32)
 
         self.centImgTransMat = M1
+        self.add_transform(M1)
 
-        cent_img = cv2.warpAffine(self.orig_img, M1, (w_o, h_o))
+        # cent_img = cv2.warpAffine(self.orig_img, M1, (w_o, h_o))
 
         M2 = cv2.getRotationMatrix2D(
             (w_o/2, h_o/2),
@@ -498,7 +527,11 @@ class QuadrantFolder:
             1
         )
 
-        self.orig_img = cv2.warpAffine(cent_img, M2, (w_o, h_o))
+        self.add_transform(M2)
+
+        transform = self.info.get("transform")
+
+        self.orig_img = cv2.warpAffine(cent_img, transform, (w_o, h_o))
 
         # new_center = [x - (tx * cos - ty * sin), y - (tx * sin + ty * cos)]
 
