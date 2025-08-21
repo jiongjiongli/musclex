@@ -106,6 +106,7 @@ class QuadrantFolder:
         self.info.setdefault("center_history", [])
         self.info.setdefault("angle_history", [])
         self.info.setdefault("transform", None)
+        self.self.max_num_history = 5
 
         #Nick Allison
         #Used for persistirng the center when processing a folder of images that
@@ -184,7 +185,7 @@ class QuadrantFolder:
             return -1.0, -1.0
 
     def get_latest_center(self):
-        center_history = self.get("center_history")
+        center_history = self.info.get("center_history")
 
         if center_history:
             latest_center_info = center_history[-1]
@@ -198,18 +199,51 @@ class QuadrantFolder:
             "source": source,
         }
 
+        print("=" * 20)
+        print(f"Add center: {center_info}")
+        print("-" * 20)
+
         self.info.setdefault("center_history", [])
         self.info["center_history"].append(center_info)
+
+        self.info["center_history"] = self.info["center_history"][-self.max_num_history:]
+
+        if self.parent:
+            self.parent.eventEmitter.imageCenterChangedSignal.emit(center)
+
+    def get_latest_angle(self):
+        angle_history = self.info.get("angle_history")
+
+        if angle_history:
+            latest_angle_info = angle_history[-1]
+            return latest_angle_info["angle"]
+
+        return None
+
+    def add_angle(self, angle, source):
+        angle_info = {
+            "angle": angle,
+            "source": source,
+        }
+
+        print("=" * 20)
+        print(f"Add angle: {angle_info}")
+        print("-" * 20)
+
+        self.info.setdefault("angle_history", [])
+        self.info["angle_history"].append(angle_info)
+
+        self.info["angle_history"] = self.info["angle_history"][-self.max_num_history:]
 
     def add_transform(self, M):
         prev_transform = self.info.get("transform")
 
-        if prev_transform:
+        if prev_transform is not None:
             self.info["transform"] = self.merge_warps((prev_transform, M))
         else:
             self.info["transform"] = M
 
-    def merge_warps(warps):
+    def merge_warps(self, warps):
         M_total = np.eye(3, dtype=np.float32)
 
         for W in warps:
@@ -376,6 +410,8 @@ class QuadrantFolder:
         self.orig_image_center = getCenter(self.orig_img)
         self.orig_img, self.info['center'] = processImageForIntCenter(self.orig_img, self.orig_image_center)
         self.fixedCenterX, self.fixedCenterY = None, None
+
+        self.add_center(self.info['center'], "getCenter-processImageForIntCenter")
         print("Done. Center = "+str(self.info['center']))
 
     def rotateImg(self):
@@ -447,9 +483,21 @@ class QuadrantFolder:
 
         if self is None:
             return [0,0], (0,0)
+
+        center = self.get_latest_center()
+        if center:
+            self.info['center'] = center
+            return [0,0], center
+
         if self.orig_image_center is None and (self.fixedCenterX == None or self.fixedCenterY == None):
             self.findCenter()
             self.statusPrint("Done.")
+
+        center = self.get_latest_center()
+        if center:
+            self.info['center'] = center
+            return [0,0], center
+
         """
         if self.fixedCenterX is not None and self.fixedCenterY is not None:
             center = []
@@ -531,13 +579,14 @@ class QuadrantFolder:
 
         transform = self.info.get("transform")
 
-        self.orig_img = cv2.warpAffine(cent_img, transform, (w_o, h_o))
+        self.orig_img = cv2.warpAffine(self.orig_img, transform, (w_o, h_o))
 
         # new_center = [x - (tx * cos - ty * sin), y - (tx * sin + ty * cos)]
 
         self.old_center = self.info['center']
         #self.info['center'] = new_center
         self.info['center'] = w_o//2, h_o//2
+        self.add_center(self.info['center'], "transformImage")
 
     def centerizeImage(self):
         """
