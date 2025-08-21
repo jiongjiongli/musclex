@@ -235,6 +235,10 @@ class QuadrantFolder:
 
         self.info["angle_history"] = self.info["angle_history"][-self.max_num_history:]
 
+        if self.parent:
+            self.parent.eventEmitter.angleChangedSignal.emit(angle)
+
+
     def add_transform(self, M):
         prev_transform = self.info.get("transform")
 
@@ -387,7 +391,7 @@ class QuadrantFolder:
             self.info['mask_thres'] = getMaskThreshold(self.orig_img)
 
         center = self.get_latest_center()
-        if center:
+        if center is not None:
             self.info['center'] = center
             return
 
@@ -411,7 +415,7 @@ class QuadrantFolder:
         self.orig_img, self.info['center'] = processImageForIntCenter(self.orig_img, self.orig_image_center)
         self.fixedCenterX, self.fixedCenterY = None, None
 
-        self.add_center(self.info['center'], "getCenter-processImageForIntCenter")
+        self.add_center(self.info['center'], "algorithm-getCenter-processImageForIntCenter")
         print("Done. Center = "+str(self.info['center']))
 
     def rotateImg(self):
@@ -450,42 +454,47 @@ class QuadrantFolder:
         Figures out the rotation angle to use on the image.
         """
         self.parent.statusPrint("Finding Rotation Angle...")
-        if self.fixedRot is not None:
-            self.info['rotationAngle'] = self.fixedRot
-            self.deleteFromDict(self.info, 'avg_fold')
-        elif 'manual_rotationAngle' in self.info:
-            self.info['rotationAngle'] = self.info['manual_rotationAngle']
-            del self.info['manual_rotationAngle']
-            self.deleteFromDict(self.info, 'avg_fold')
-        elif "mode_angle" in self.info:
-            print(f'Using mode orientation {self.info["mode_angle"]}')
-            self.info['rotationAngle'] = self.info["mode_angle"]
-            self.deleteFromDict(self.info, 'avg_fold')
-        elif not self.empty and 'rotationAngle' not in self.info.keys():
-            print("Rotation Angle is being calculated ... ")
-            # Selecting disk (base) image and corresponding center for determining rotation as for larger images (formed from centerize image) rotation angle is wrongly computed
-            #_, center = self.parent.getExtentAndCenter()
-            _, center = self.getExtentAndCenter()
-            img = copy.copy(self.initImg) if self.initImg is not None else copy.copy(self.orig_img)
-            if 'detector' in self.info:
-                self.info['rotationAngle'] = getRotationAngle(img, center, self.info['orientation_model'], man_det=self.info['detector'])
-            else:
-                self.info['rotationAngle'] = getRotationAngle(img, center, self.info['orientation_model'])
-            self.deleteFromDict(self.info, 'avg_fold')
-        print("Done. Rotation Angle is " + str(self.info['rotationAngle']) +" degree")
 
+        angle = self.get_latest_angle()
+        if angle is not None:
+            self.info['rotationAngle'] = angle
+            self.deleteFromDict(self.info, 'avg_fold')
+            return
+
+        # if self.fixedRot is not None:
+        #     self.info['rotationAngle'] = self.fixedRot
+        #     self.deleteFromDict(self.info, 'avg_fold')
+        # elif 'manual_rotationAngle' in self.info:
+        #     self.info['rotationAngle'] = self.info['manual_rotationAngle']
+        #     del self.info['manual_rotationAngle']
+        #     self.deleteFromDict(self.info, 'avg_fold')
+        # elif "mode_angle" in self.info:
+        #     print(f'Using mode orientation {self.info["mode_angle"]}')
+        #     self.info['rotationAngle'] = self.info["mode_angle"]
+        #     self.deleteFromDict(self.info, 'avg_fold')
+        # elif not self.empty and 'rotationAngle' not in self.info.keys():
+
+        print("Rotation Angle is being calculated ... ")
+        # Selecting disk (base) image and corresponding center for determining rotation as for larger images (formed from centerize image) rotation angle is wrongly computed
+        #_, center = self.parent.getExtentAndCenter()
+        _, center = self.getExtentAndCenter()
+        img = copy.copy(self.initImg) if self.initImg is not None else copy.copy(self.orig_img)
+        if 'detector' in self.info:
+            self.info['rotationAngle'] = getRotationAngle(img, center, self.info['orientation_model'], man_det=self.info['detector'])
+        else:
+            self.info['rotationAngle'] = getRotationAngle(img, center, self.info['orientation_model'])
+
+        self.add_angle(self.info['rotationAngle'], "algorithm-getRotationAngle")
+        self.deleteFromDict(self.info, 'avg_fold')
+        print("Done. Rotation Angle is " + str(self.info['rotationAngle']) +" degree")
 
     def getExtentAndCenter(self):
         """
         Give the extent and the center of the image in self.
         :return: extent, center
         """
-
-        if self is None:
-            return [0,0], (0,0)
-
         center = self.get_latest_center()
-        if center:
+        if center is not None:
             self.info['center'] = center
             return [0,0], center
 
@@ -494,7 +503,7 @@ class QuadrantFolder:
             self.statusPrint("Done.")
 
         center = self.get_latest_center()
-        if center:
+        if center is not None:
             self.info['center'] = center
             return [0,0], center
 

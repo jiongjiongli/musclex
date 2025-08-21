@@ -192,6 +192,7 @@ class Worker(QRunnable):
 
 class EventEmitter(QObject):
     imageCenterChangedSignal = Signal(tuple)
+    angleChangedSignal = Signal(tuple)
 
 class QuadrantFoldingGUI(QMainWindow):
 
@@ -437,9 +438,9 @@ class QuadrantFoldingGUI(QMainWindow):
         self.persistCenter = QCheckBox("Persist Center")
         self.persistCenter.setEnabled(False)
 
-        self.rotationSpnBx = QSpinBox()
-        self.rotationSpnBx.setRange(0, 180)
-        self.rotationSpnBx.setValue(0)
+        self.rotationSpnBx = QDoubleSpinBox()
+        self.rotationSpnBx.setRange(0.0, 180.0)
+        self.rotationSpnBx.setValue(0.0)
         self.rotationSpnBx.setKeyboardTracking(False)
         self.rotationSpnBx.setEnabled(False)
 
@@ -1265,6 +1266,11 @@ class QuadrantFoldingGUI(QMainWindow):
         self.eventEmitter.imageCenterChangedSignal.connect(
             lambda center: self.imageCenter.setText(
                 f"x={center[0]:.2f}, y={center[1]:.2f}"
+        ))
+
+        self.eventEmitter.angleChangedSignal.connect(
+            lambda angleDegree: self.rotationSpnBx.setValue(
+                angleDegree
         ))
 
         ##### Result Tab #####
@@ -2138,6 +2144,8 @@ class QuadrantFoldingGUI(QMainWindow):
                     self.quadFold.info['manual_center'] = (cx, cy)
                     if 'center' in self.quadFold.info:
                         del self.quadFold.info['center']
+
+                    self.setAngle(new_angle, "CenterRotate")
                     self.quadFold.info['manual_rotationAngle'] = self.quadFold.info['rotationAngle'] + new_angle
                     self.deleteInfo(['avg_fold'])
                     self.newImgDimension = None
@@ -2168,7 +2176,7 @@ class QuadrantFoldingGUI(QMainWindow):
                 else:
                     new_angle = -180. * np.arctan((y1 - y2) / abs(x1 - x2)) / np.pi
 
-
+                self.setAngle(new_angle, "Rotate")
                 #self.quadFold.info['manual_rotationAngle'] = self.quadFold.info['rotationAngle'] + new_angle
                 self.quadFold.info['manual_rotationAngle'] = new_angle
 
@@ -3446,6 +3454,10 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.quadFold:
             self.quadFold.add_center(center, source)
 
+    def setAngle(self, angle, source):
+        if self.quadFold:
+            self.quadFold.add_angle(angle, source)
+
     def updateResultTab(self):
         """
         Display result image in result tab
@@ -3869,6 +3881,7 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.modeAngleChkBx.isChecked():
             modeOrientation = self.getModeRotation()
             if modeOrientation is not None:
+                self.setAngle(modeOrientation, "ModeAngle")
                 flags["mode_angle"] = modeOrientation
 
         if self.rminSpnBx.value() > 0:
