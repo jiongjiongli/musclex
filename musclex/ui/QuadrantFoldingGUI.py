@@ -428,21 +428,16 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.rotationAngleGroup = QGroupBox("Set Rotation Angle")
         self.rotationAngleLayout = QGridLayout(self.rotationAngleGroup)
-        self.setRotationButton = QPushButton("Set Angle Graphically")
+        self.setRotationButton = QPushButton("Set Angle Interactively")
         self.setRotationButton.setCheckable(False)
         self.checkableButtons.append(self.setRotationButton)
 
-        self.imageCenter = QLineEdit()
-        self.imageCenter.setEnabled(False)
+        self.imageCenter = QLabel()
 
         self.persistCenter = QCheckBox("Persist Center")
         self.persistCenter.setEnabled(False)
 
-        self.rotationSpnBx = QDoubleSpinBox()
-        self.rotationSpnBx.setRange(0.0, 180.0)
-        self.rotationSpnBx.setValue(0.0)
-        self.rotationSpnBx.setKeyboardTracking(False)
-        self.rotationSpnBx.setEnabled(False)
+        self.rotationAngleLabel = QLabel()
 
         self.persistRotation = QCheckBox("Persist Rotation")
         self.persistRotation.setEnabled(False)
@@ -487,8 +482,7 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setCenterLayout.addWidget(self.setCentByChords, centerLayoutRowIndex, 0, 1, 2)
         self.setCenterLayout.addWidget(self.setCentByPerp, centerLayoutRowIndex, 2, 1, 2)
         centerLayoutRowIndex += 1
-        self.setCenterLayout.addWidget(QLabel("Image Center (Pixel): "), centerLayoutRowIndex, 0, 1, 2)
-        self.setCenterLayout.addWidget(self.imageCenter, centerLayoutRowIndex, 2, 1, 2)
+        self.setCenterLayout.addWidget(self.imageCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.persistCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
@@ -496,8 +490,7 @@ class QuadrantFoldingGUI(QMainWindow):
         rotationAngleRowIndex = 0
         self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 2)
         rotationAngleRowIndex += 1
-        self.rotationAngleLayout.addWidget(QLabel("Rotation Angle (Degree): "), rotationAngleRowIndex, 0, 1, 2)
-        self.rotationAngleLayout.addWidget(self.rotationSpnBx, rotationAngleRowIndex, 2, 1, 2)
+        self.rotationAngleLayout.addWidget(self.rotationAngleLabel, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
         self.rotationAngleLayout.addWidget(self.persistRotation, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
@@ -1265,12 +1258,12 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.eventEmitter.imageCenterChangedSignal.connect(
             lambda center: self.imageCenter.setText(
-                f"x={center[0]:.2f}, y={center[1]:.2f}"
+                f"Center (Current coords): x={center[0]:.2f}, y={center[1]:.2f} px"
         ))
 
         self.eventEmitter.angleChangedSignal.connect(
-            lambda angleDegree: self.rotationSpnBx.setValue(
-                angleDegree
+            lambda angleDegree: self.rotationAngleLabel.setText(
+                f"Rotation Angle (Original Coords): {angleDegree:.2f} °"
         ))
 
         ##### Result Tab #####
@@ -1590,6 +1583,19 @@ class QuadrantFoldingGUI(QMainWindow):
         """
         Calculate the center in original image coordinates
         """
+
+        if self.quadFold:
+            inv_transform = self.quadFold.info.get("inv_transform")
+
+            if inv_transform is not None:
+                # Convert to homogeneous coordinates
+                point = np.array([x, y, 1])
+                origin_point = inv_transform @ point
+
+                origin_x, origin_y = origin_point
+                return origin_x, origin_y
+
+
         _, center = self.getExtentAndCenter()
         center = self.quadFold.info['center']
         #rotation angle in radians
@@ -2157,19 +2163,26 @@ class QuadrantFoldingGUI(QMainWindow):
                 extent, center = self.getExtentAndCenter()
                 center = self.quadFold.info['center']
 
-                x_o, y_o = self.getOrigCoordsCenter(x, y)
-                cx_o, cy_o = self.getOrigCoordsCenter(center[0], center[1])
+                # x_o, y_o = self.getOrigCoordsCenter(x, y)
+                # cx_o, cy_o = self.getOrigCoordsCenter(center[0], center[1])
 
-                if cx_o < x:
-                    x1 = cx_o
-                    y1 = cy_o
-                    x2 = x_o
-                    y2 = y_o
+                if center[0] < x:
+                    x1, y1 = center
+                    x2, y2 = x, y
                 else:
-                    x1 = x_o
-                    y1 = y_o
-                    x2 = cx_o
-                    y2 = cy_o
+                    x1, y1 = x, y
+                    x2, y2 = center
+
+                # if cx_o < x:
+                #     x1 = cx_o
+                #     y1 = cy_o
+                #     x2 = x_o
+                #     y2 = y_o
+                # else:
+                #     x1 = x_o
+                #     y1 = y_o
+                #     x2 = cx_o
+                #     y2 = cy_o
 
                 if abs(x2 - x1) == 0:
                     new_angle = -90
@@ -2180,14 +2193,12 @@ class QuadrantFoldingGUI(QMainWindow):
                 #self.quadFold.info['manual_rotationAngle'] = self.quadFold.info['rotationAngle'] + new_angle
                 self.quadFold.info['manual_rotationAngle'] = new_angle
 
-
-
                 self.deleteInfo(['avg_fold'])
                 self.setRotationButton.setChecked(False)
                 self.persistRotation.setVisible(True)
 
                 #Put the center (in original image coordinates) into the manual center entry of the key so that it will be used during processing.
-                self.quadFold.info['manual_center'] = (int(round(cx_o)), int(round(cy_o)))
+                # self.quadFold.info['manual_center'] = (int(round(cx_o)), int(round(cy_o)))
                 if 'center' in self.quadFold.info:
                     del self.quadFold.info['center']
 
@@ -2255,7 +2266,6 @@ class QuadrantFoldingGUI(QMainWindow):
                     unit = "nm^-1"
                 else:
                     q = mouse_distance
-                q = f"{q:.4f}"
                 # constant = self.calSettings["silverB"] * self.calSettings["radius"]
                 # calib_distance = mouse_distance * 1.0/constant
                 # calib_distance = f"{calib_distance:.4f}"
@@ -2263,21 +2273,21 @@ class QuadrantFoldingGUI(QMainWindow):
                 #extent = self.extent
                 sx = x + extent[0]
                 sy = y + extent[1]
+
+                image_height = img.shape[0]
+                image_wdith = img.shape[1]
+                int_x = min(max(int(round(x)), 0), image_wdith - 1)
+                int_y = min(max(int(round(y)), 0), image_height - 1)
+                pixel_value = img[int_x, int_y]
+
                 if self.calSettings is not None and self.calSettings and 'scale' in self.calSettings:
-                    try:
-                        self.imgCoordOnStatusBar.setText("x=" + str(x) + ', y=' + str(y) + ", value=" + str(img[int(sy)][int(sx)]) + ", distance=" + str(q) + unit)
-                    except:
-                        self.imgCoordOnStatusBar.setText("x=NaN" + ', y=NaN'+ ", value=" + "NaN" + ", distance=NaN" + unit)
+                    self.imgCoordOnStatusBar.setText("Cursor (Current coords): x={x:.2f}, y={y:.2f}, value={pixel_value:.2f}, distance={q:.2f} {unit}")
                 else:
                     mouse_distance = np.sqrt((self.quadFold.info['center'][0] - x) ** 2 + (self.quadFold.info['center'][1] - y) ** 2)
-                    mouse_distance = f"{mouse_distance:.4f}"
-                    try:
-                        self.imgCoordOnStatusBar.setText("x=" + str(x) + ', y=' + str(y) + ", value=" + str(img[int(sy)][int(sx)]) + ", distance=" + str(mouse_distance) + unit)
-                    except:
-                        pass
+                    self.imgCoordOnStatusBar.setText(f"Cursor (Current coords): x={x:.2f}, y={y:.2f}, value={pixel_value:.2f}, distance={mouse_distance:.2f} {unit}")
 
                 o_x, o_y = self.getOrigCoordsCenter(x, y)
-                self.left_status.setText("Original Image Coordinates: x=" + str(o_x) + ', y=' + str(o_y))
+                self.left_status.setText(f"Cursor (Original coords): x={o_x:.2f}, y={o_y:.2f}")
 
                 self.doubleZoomGUI.mouseHoverBehavior(sx, sy, img, self.imageCanvas, self.doubleZoom.isChecked())
 
@@ -3085,8 +3095,8 @@ class QuadrantFoldingGUI(QMainWindow):
         self.spmaxInt.setSingleStep(max_val * .05)
         self.spminInt.setSingleStep(max_val * .05)
 
-        self.minIntLabel.setText("Min Intensity ("+str(min_val)+")")
-        self.maxIntLabel.setText("Max Intensity (" + str(max_val) + ")")
+        self.minIntLabel.setText(f"Min Intensity ({min_val:.2f})")
+        self.maxIntLabel.setText(f"Max Intensity ({max_val:.2f})")
 
         if 'float' in str(img.dtype):
             self.spmaxInt.setDecimals(2)
@@ -3200,10 +3210,10 @@ class QuadrantFoldingGUI(QMainWindow):
             self.quadFold.info['saveCroppedImage'] = self.cropFoldedImageChkBx.isChecked()
         self.markFixedInfo(self.quadFold.info, previnfo)
         original_image = self.quadFold.orig_img
-        if self.calSettings is not None and not self.calSettings:
-            self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype))
-        elif self.calSettings is not None and self.calSettings:
-            self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype) + " (Image Calibrated)")
+        # if self.calSettings is not None and not self.calSettings:
+        #     self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype))
+        # elif self.calSettings is not None and self.calSettings:
+        #     self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype) + " (Image Calibrated)")
         self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype))
         self.initialWidgets(original_image, previnfo)
         if 'ignore_folds' in self.quadFold.info:
@@ -3434,16 +3444,23 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.quadFold.orig_image_center is None and (self.quadFold.fixedCenterX is None or self.quadFold.fixedCenterY is None):
             self.quadFold.findCenter()
             self.statusPrint("Done.")
-        if self.quadFold.fixedCenterX is not None and self.quadFold.fixedCenterY is not None:
-            center = []
-            center.append(self.quadFold.fixedCenterX)
-            center.append(self.quadFold.fixedCenterY)
-        elif 'calib_center' in self.quadFold.info:
-            center = self.quadFold.info['calib_center']
-        elif 'manual_center' in self.quadFold.info:
-            center = self.quadFold.info['manual_center']
-        else:
-            center = self.quadFold.orig_image_center
+
+        if self.quadFold is not None:
+            latest_center = self.quadFold.get_latest_center()
+
+            if latest_center:
+                return [0, 0], latest_center
+
+        # if self.quadFold.fixedCenterX is not None and self.quadFold.fixedCenterY is not None:
+        #     center = []
+        #     center.append(self.quadFold.fixedCenterX)
+        #     center.append(self.quadFold.fixedCenterY)
+        # elif 'calib_center' in self.quadFold.info:
+        #     center = self.quadFold.info['calib_center']
+        # elif 'manual_center' in self.quadFold.info:
+        #     center = self.quadFold.info['manual_center']
+        # else:
+        #     center = self.quadFold.orig_image_center
         if 'center' not in self.quadFold.info:
             extent = [0, 0]
         else:
@@ -3932,7 +3949,6 @@ class QuadrantFoldingGUI(QMainWindow):
                 self.setCentByChords.setCheckable(True)
                 self.setCentByPerp.setCheckable(True)
                 self.setCenterRotationButton.setCheckable(True)
-                self.imageCenter.setEnabled(True)
 
                 self.setRotationButton.setCheckable(True)
 
