@@ -1595,7 +1595,6 @@ class QuadrantFoldingGUI(QMainWindow):
                 origin_x, origin_y = origin_point
                 return origin_x, origin_y
 
-
         _, center = self.getExtentAndCenter()
         center = self.quadFold.info['center']
         #rotation angle in radians

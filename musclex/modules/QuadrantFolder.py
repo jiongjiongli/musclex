@@ -273,7 +273,6 @@ class QuadrantFolder:
         # To display cursor point in original image.
         self.info["inv_transform"] = cv2.invertAffineTransform(self.info["transform"])
 
-
     def merge_warps(self, warps):
         M_total = np.eye(3, dtype=np.float32)
 
@@ -422,21 +421,21 @@ class QuadrantFolder:
             self.info['center'] = center
             return
 
-        if 'center' in self.info:
-            self.centerChanged = False
-            return
-        self.centerChanged = True
-        if 'calib_center' in self.info:
-            self.info['center'] = self.info['calib_center']
-            self.fixedCenterX = self.info['calib_center'][0]
-            self.fixedCenterY = self.info['calib_center'][1]
-            return
-        if 'manual_center' in self.info:
-            center = self.info['manual_center']
-            self.info['center'] = self.info['manual_center']
-            self.fixedCenterX = self.info['manual_center'][0]
-            self.fixedCenterY = self.info['manual_center'][1]
-            return
+        # if 'center' in self.info:
+        #     self.centerChanged = False
+        #     return
+        # self.centerChanged = True
+        # if 'calib_center' in self.info:
+        #     self.info['center'] = self.info['calib_center']
+        #     self.fixedCenterX = self.info['calib_center'][0]
+        #     self.fixedCenterY = self.info['calib_center'][1]
+        #     return
+        # if 'manual_center' in self.info:
+        #     center = self.info['manual_center']
+        #     self.info['center'] = self.info['manual_center']
+        #     self.fixedCenterX = self.info['manual_center'][0]
+        #     self.fixedCenterY = self.info['manual_center'][1]
+        #     return
         print("Center is being calculated ... ")
         self.orig_image_center = getCenter(self.orig_img)
         self.orig_img, self.info['center'] = processImageForIntCenter(self.orig_img, self.orig_image_center)
