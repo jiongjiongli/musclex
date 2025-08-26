@@ -29,6 +29,7 @@ authorization from Illinois Institute of Technology.
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.colors import LogNorm, Normalize, ListedColormap
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -45,8 +46,16 @@ from PySide6.QtCore import Qt
 
 
 class AdjustCentDialog(QDialog):
-    def __init__(self, parent, img, center):
-        super().__init__(parent)
+    def __init__(self,
+                parent,
+                img,
+                center,
+                isLogScale,
+                vmin,
+                vmax
+        ):
+        super().__init__()
+        self.setModal(True)
         self.setWindowTitle("Adjust Center")
         self.img = img
         self.center = center
@@ -58,6 +67,19 @@ class AdjustCentDialog(QDialog):
         self.imageCanvas = FigureCanvas(self.imageFigure)
 
         self.imageAxes.imshow(self.img, cmap="gray")
+        if isLogScale:
+            self.imageAxes.imshow(
+                self.img,
+                cmap="gray",
+                norm=LogNorm(vmin=max(1, vmin), vmax=vmax),
+            )
+        else:
+            self.imageAxes.imshow(
+                self.img,
+                cmap="gray",
+                norm=Normalize(vmin=vmin, vmax=vmax),
+            )
+
         self.imageAxes.set_xlim((0, self.img.shape[1]))
         self.imageAxes.set_ylim((0, self.img.shape[0]))
         self.vline = self.imageAxes.axvline(x, color='y')
@@ -65,8 +87,8 @@ class AdjustCentDialog(QDialog):
 
         self.xInput = QLineEdit(f"{x:.2f}")
         self.yInput = QLineEdit(f"{y:.2f}")
-        self.updateBtn = QPushButton("Update Center")
-        self.updateBtn.clicked.connect(self.updateCenterFromInput)
+        # self.updateBtn = QPushButton("Update Center")
+        # self.updateBtn.clicked.connect(self.updateCenterFromInput)
 
         # Update center immediately when losing focus or pressing enter, without closing dialog
         self.xInput.returnPressed.connect(self.updateCenterFromInput)
@@ -79,19 +101,19 @@ class AdjustCentDialog(QDialog):
         self.inputLayout.addWidget(self.xInput)
         self.inputLayout.addWidget(QLabel("Y:"))
         self.inputLayout.addWidget(self.yInput)
-        self.inputLayout.addWidget(self.updateBtn)
+        # self.inputLayout.addWidget(self.updateBtn)
 
-        # Output boxes to show actual center values
-        self.xOutput = QLineEdit(f"{x:.2f}")
-        self.yOutput = QLineEdit(f"{y:.2f}")
-        self.xOutput.setReadOnly(True)
-        self.yOutput.setReadOnly(True)
+        # # Output boxes to show actual center values
+        # self.xOutput = QLineEdit(f"{x:.2f}")
+        # self.yOutput = QLineEdit(f"{y:.2f}")
+        # self.xOutput.setReadOnly(True)
+        # self.yOutput.setReadOnly(True)
 
-        self.outputLayout = QHBoxLayout()
-        self.outputLayout.addWidget(QLabel("Actual X:"))
-        self.outputLayout.addWidget(self.xOutput)
-        self.outputLayout.addWidget(QLabel("Actual Y:"))
-        self.outputLayout.addWidget(self.yOutput)
+        # self.outputLayout = QHBoxLayout()
+        # self.outputLayout.addWidget(QLabel("Actual X:"))
+        # self.outputLayout.addWidget(self.xOutput)
+        # self.outputLayout.addWidget(QLabel("Actual Y:"))
+        # self.outputLayout.addWidget(self.yOutput)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -102,9 +124,11 @@ class AdjustCentDialog(QDialog):
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.imageCanvas)
         self.layout.addLayout(self.inputLayout)
-        self.layout.addLayout(self.outputLayout)
+        # self.layout.addLayout(self.outputLayout)
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
+
+        self.resize(1000, 1000 // 4 * 3)
 
         self.createConnections()
 
@@ -125,9 +149,9 @@ class AdjustCentDialog(QDialog):
             return
 
         self.center = (event.xdata, event.ydata)
-        self.refreshCenter()
+        self.refreshCenter(updateText=True)
 
-    def refreshCenter(self):
+    def refreshCenter(self, updateText=False):
         x, y = self.center
 
         # Remove old lines
@@ -138,21 +162,17 @@ class AdjustCentDialog(QDialog):
         self.vline = self.imageAxes.axvline(x, color='y')
         self.hline = self.imageAxes.axhline(y, color='y')
 
-        # Update input output
-        self.xInput.setText(f"{x:.2f}")
-        self.yInput.setText(f"{y:.2f}")
-        self.xOutput.setText(f"{x:.2f}")
-        self.yOutput.setText(f"{y:.2f}")
+        if updateText:
+            # Update input output
+            self.xInput.setText(f"{x:.2f}")
+            self.yInput.setText(f"{y:.2f}")
+            # self.xOutput.setText(f"{x:.2f}")
+            # self.yOutput.setText(f"{y:.2f}")
 
         self.imageCanvas.draw_idle()
 
     def updateCenterFromInput(self):
-        try:
             x = float(self.xInput.text())
             y = float(self.yInput.text())
             self.center = (x, y)
-            self.refreshCenter()
-        except ValueError:
-            raise
-
-
+            self.refreshCenter(updateText=False)

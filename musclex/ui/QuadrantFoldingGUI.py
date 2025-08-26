@@ -1859,15 +1859,23 @@ class QuadrantFoldingGUI(QMainWindow):
             center = self.quadFold.info.get('center')
 
             if (img is not None) and center:
-                self.adjustCentDialog = AdjustCentDialog(self, img, center)
+                self.adjustCentDialog = AdjustCentDialog(self,
+                    img,
+                    center,
+                    isLogScale=self.logScaleIntChkBx.isChecked(),
+                    vmin=self.spminInt.value(),
+                    vmax=self.spmaxInt.value()
+                )
                 dialogCode = self.adjustCentDialog.exec()
 
-                print(f"AdjustCentDialog dialogCode: {dialogCode}")
+                # print(f"AdjustCentDialog dialogCode: {dialogCode}")
 
                 if dialogCode == QDialog.Accepted:
-                    pass
+                    center = self.adjustCentDialog.center
+                    self.setCenter(center, "AdjustCentDialog")
+                    self.processImage()
                 else:
-                    assert dialogCode == QDialog.Rejected, dialogCode
+                    assert dialogCode == QDialog.Rejected, f"AdjustCentDialog closed with unexpected code:{dialogCode}"
 
     def drawPerpendiculars(self):
         """
