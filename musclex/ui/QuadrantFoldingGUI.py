@@ -49,7 +49,9 @@ from ..csv_manager.QF_CSVManager import QF_CSVManager
 from .pyqt_utils import *
 from .BlankImageSettings import BlankImageSettings
 from .ImageMaskTool import ImageMaskerWindow
-from .DoubleZoomGUI import DoubleZoom
+# from .DoubleZoomGUI import DoubleZoom
+from .DoubleZoomViewer import DoubleZoom
+from .AdjustCentDialog import AdjustCentDialog
 from ..CalibrationSettings import CalibrationSettings
 from threading import Lock
 from scipy.ndimage import rotate
@@ -247,6 +249,8 @@ class QuadrantFoldingGUI(QMainWindow):
         self.qf_lock = Lock()
         self.imageMaskingTool = None
 
+        self.adjustCentDialog = None
+
         self.rotationAngle = None
 
         self.calSettingsDialog = None
@@ -330,6 +334,7 @@ class QuadrantFoldingGUI(QMainWindow):
         self.verImgLayout.addWidget(self.selectImageButton)
         self.imageFigure = plt.figure()
         self.imageAxes = self.imageFigure.add_subplot(111)
+        self.imageAxes.set_aspect('equal', adjustable="box")
         self.imageCanvas = FigureCanvas(self.imageFigure)
 
 
@@ -426,11 +431,19 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setCentByPerp.setCheckable(False)
         self.checkableButtons.append(self.setCentByPerp)
 
+        self.adjustCentBtn = QPushButton("Adjust Center Manually")
+        self.adjustCentBtn.setCheckable(False)
+        self.checkableButtons.append(self.adjustCentBtn)
+
         self.rotationAngleGroup = QGroupBox("Set Rotation Angle")
         self.rotationAngleLayout = QGridLayout(self.rotationAngleGroup)
         self.setRotationButton = QPushButton("Set Angle Interactively")
         self.setRotationButton.setCheckable(False)
         self.checkableButtons.append(self.setRotationButton)
+
+        self.adjustAngleBtn = QPushButton("Adjust Angle Manually")
+        self.adjustAngleBtn.setCheckable(False)
+        self.checkableButtons.append(self.adjustAngleBtn)
 
         self.imageCenter = QLabel()
 
@@ -482,13 +495,17 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setCenterLayout.addWidget(self.setCentByChords, centerLayoutRowIndex, 0, 1, 2)
         self.setCenterLayout.addWidget(self.setCentByPerp, centerLayoutRowIndex, 2, 1, 2)
         centerLayoutRowIndex += 1
+        self.setCenterLayout.addWidget(self.adjustCentBtn, centerLayoutRowIndex, 0, 1, 4)
+        centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.imageCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.persistCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
 
         rotationAngleRowIndex = 0
-        self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 2)
+        self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 4)
+        rotationAngleRowIndex += 1
+        self.rotationAngleLayout.addWidget(self.adjustAngleBtn, centerLayoutRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
         self.rotationAngleLayout.addWidget(self.rotationAngleLabel, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
@@ -1035,6 +1052,7 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.resultFigure = plt.figure()
         self.resultAxes = self.resultFigure.add_subplot(111)
+        self.resultAxes.set_aspect('equal', adjustable="box")
         self.resultVLayout = QVBoxLayout()
         self.resultCanvas = FigureCanvas(self.resultFigure)
         self.resultTabLayout.addWidget(self.resultCanvas)
@@ -1248,6 +1266,8 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setRotationButton.clicked.connect(self.setRotation)
         self.setCentByChords.clicked.connect(self.setCenterByChordsClicked)
         self.setCentByPerp.clicked.connect(self.setCenterByPerpClicked)
+        self.adjustCentBtn.clicked.connect(self.adjustCentBtnClicked)
+        self.adjustAngleBtn.clicked.connect(self.adjustAngleBtnClicked)
         self.maskThresSpnBx.valueChanged.connect(self.ignoreThresChanged)
         self.imageFigure.canvas.mpl_connect('button_press_event', self.imageClicked)
         self.imageFigure.canvas.mpl_connect('motion_notify_event', self.imageOnMotion)
@@ -1833,6 +1853,22 @@ class QuadrantFoldingGUI(QMainWindow):
             self.setCentByChords.setChecked(False)
             self.processImage()
 
+    def adjustCentBtnClicked(self):
+        if self.quadFold:
+            img = self.quadFold.orig_img
+            center = self.quadFold.info.get('center')
+
+            if (img is not None) and center:
+                self.adjustCentDialog = AdjustCentDialog(self, img, center)
+                dialogCode = self.adjustCentDialog.exec()
+
+                print(f"AdjustCentDialog dialogCode: {dialogCode}")
+
+                if dialogCode == QDialog.Accepted:
+                    pass
+                else:
+                    assert dialogCode == QDialog.Rejected, dialogCode
+
     def drawPerpendiculars(self):
         """
         Draw perpendiculars on the image
@@ -1877,6 +1913,9 @@ class QuadrantFoldingGUI(QMainWindow):
             self.function = None
             self.display_points = None
             self.resetStatusbar()
+
+    def adjustAngleBtnClicked(self):
+        pass
 
     def calibrationClicked(self):
         """
@@ -2288,7 +2327,16 @@ class QuadrantFoldingGUI(QMainWindow):
                 o_x, o_y = self.getOrigCoordsCenter(x, y)
                 self.left_status.setText(f"Cursor (Original coords): x={o_x:.2f}, y={o_y:.2f}")
 
-                self.doubleZoomGUI.mouseHoverBehavior(sx, sy, img, self.imageCanvas, self.doubleZoom.isChecked())
+                self.doubleZoomGUI.mouseHoverBehavior(
+                    sx,
+                    sy,
+                    img,
+                    self.imageCanvas,
+                    self.doubleZoom.isChecked(),
+                    isLogScale=self.logScaleIntChkBx.isChecked(),
+                    vmin=self.spminInt.value(),
+                    vmax=self.spmaxInt.value()
+                )
 
         ax = self.imageAxes
         # Calculate new x,y if cursor is outside figure
@@ -2990,10 +3038,15 @@ class QuadrantFoldingGUI(QMainWindow):
         """
         Triggered when double zoom is checked
         """
-        self.doubleZoomGUI.doubleZoomChecked(img=self.quadFold.getRotatedImage() if self.quadFold is not None else None,
-                                                                                  canv=self.imageCanvas,
-                                                                                  center=self.quadFold.info['center'] if self.quadFold is not None else (0,0),
-                                                                                  is_checked=self.doubleZoom.isChecked())
+        self.doubleZoomGUI.doubleZoomChecked(
+            img=self.quadFold.getRotatedImage() if self.quadFold is not None else None,
+            canv=self.imageCanvas,
+            center=self.quadFold.info['center'] if self.quadFold is not None else (0,0),
+            is_checked=self.doubleZoom.isChecked(),
+            isLogScale=self.logScaleIntChkBx.isChecked(),
+            vmin=self.spminInt.value(),
+            vmax=self.spmaxInt.value()
+        )
 
     def modeAngleChecked(self):
         """
@@ -3947,9 +4000,11 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 self.setCentByChords.setCheckable(True)
                 self.setCentByPerp.setCheckable(True)
+                self.adjustCentBtn.setCheckable(True)
                 self.setCenterRotationButton.setCheckable(True)
 
                 self.setRotationButton.setCheckable(True)
+                self.adjustAngleBtn.setCheckable(True)
 
                 self.resetWidgets()
                 QApplication.restoreOverrideCursor()
