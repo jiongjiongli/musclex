@@ -1286,7 +1286,7 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.eventEmitter.angleChangedSignal.connect(
             lambda angleDegree: self.rotationAngleLabel.setText(
-                f"Rotation Angle (Original Coords): {angleDegree:.2f} °"
+                f"Rotation Angle (Original Coords): {angleDegree % 360:.2f} °"
         ))
 
         ##### Result Tab #####
@@ -1928,16 +1928,19 @@ class QuadrantFoldingGUI(QMainWindow):
 
     def adjustAngleBtnClicked(self):
         if self.quadFold:
+            start_img = self.quadFold.start_img
             curr_img = self.quadFold.orig_img
             center = self.quadFold.get_latest_center()
-            angle = self.quadFold.get_latest_angle()
+            angle_to_origin = self.quadFold.info.get("angle_to_origin")
+            transform = self.quadFold.info.get("transform")
 
-            if (curr_img is not None) and center and (angle is not None):
-                img = curr_img.copy()
+            if (start_img is not None) and (curr_img is not None) and center and (angle_to_origin is not None) and (transform is not None):
                 self.adjustAngleDialog = AdjustAngleDialog(self,
-                    img,
+                    start_img.copy(),
+                    curr_img.copy(),
                     center,
-                    angle,
+                    angle_to_origin,
+                    transform,
                     isLogScale=self.logScaleIntChkBx.isChecked(),
                     vmin=self.spminInt.value(),
                     vmax=self.spmaxInt.value()
@@ -1947,7 +1950,7 @@ class QuadrantFoldingGUI(QMainWindow):
                 # print(f"adjustAngleDialog dialogCode: {dialogCode}")
 
                 if dialogCode == QDialog.Accepted:
-                    angle = self.adjustAngleDialog.angle
+                    angle = self.adjustAngleDialog.get_angle()
                     self.setAngle(angle, "AdjustAngleDialog")
                     self.processImage()
                 else:
