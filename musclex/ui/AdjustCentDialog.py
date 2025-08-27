@@ -39,10 +39,18 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
+    QCheckBox,
+    QFrame,
+    QScrollArea,
+    QGroupBox,
     QLineEdit,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt
+
+from .DoubleZoomViewer import DoubleZoom
 
 
 class AdjustCentDialog(QDialog):
@@ -59,6 +67,9 @@ class AdjustCentDialog(QDialog):
         self.setWindowTitle("Adjust Center")
         self.img = img
         self.center = center
+        self.isLogScale = isLogScale
+        self.vmin = vmin
+        self.vmax = vmax
         x, y = self.center
 
         self.imageFigure = plt.figure()
@@ -66,7 +77,6 @@ class AdjustCentDialog(QDialog):
         self.imageAxes.set_aspect('equal', adjustable="box")
         self.imageCanvas = FigureCanvas(self.imageFigure)
 
-        self.imageAxes.imshow(self.img, cmap="gray")
         if isLogScale:
             self.imageAxes.imshow(
                 self.img,
@@ -79,6 +89,8 @@ class AdjustCentDialog(QDialog):
                 cmap="gray",
                 norm=Normalize(vmin=vmin, vmax=vmax),
             )
+
+        self.imageAxes.set_facecolor('black')
 
         self.imageAxes.set_xlim((0, self.img.shape[1]))
         self.imageAxes.set_ylim((0, self.img.shape[0]))
@@ -96,12 +108,29 @@ class AdjustCentDialog(QDialog):
         self.xInput.editingFinished.connect(self.updateCenterFromInput)
         self.yInput.editingFinished.connect(self.updateCenterFromInput)
 
-        self.inputLayout = QHBoxLayout()
-        self.inputLayout.addWidget(QLabel("X:"))
-        self.inputLayout.addWidget(self.xInput)
-        self.inputLayout.addWidget(QLabel("Y:"))
-        self.inputLayout.addWidget(self.yInput)
-        # self.inputLayout.addWidget(self.updateBtn)
+        self.setCenterGroup = QGroupBox("Set Center")
+        self.setCenterLayout = QGridLayout(self.setCenterGroup)
+
+        # self.xInputLayout = QHBoxLayout()
+        # self.xInputLayout.addWidget(QLabel("X:"))
+        # self.xInputLayout.addWidget(self.xInput)
+
+        # self.yInputLayout = QHBoxLayout()
+        # self.yInputLayout.addWidget(QLabel("Y:"))
+        # self.yInputLayout.addWidget(self.yInput)
+
+        centerLayoutRowIndex = 0
+        self.setCenterLayout.addWidget(QLabel("X (Current coords): "), centerLayoutRowIndex, 0, 1, 2)
+        self.setCenterLayout.addWidget(self.xInput, centerLayoutRowIndex, 2, 1, 2)
+        self.setCenterLayout.addWidget(QLabel("px"), centerLayoutRowIndex, 4, 1, 1)
+        centerLayoutRowIndex += 1
+        self.setCenterLayout.addWidget(QLabel("Y (Current coords): "), centerLayoutRowIndex, 0, 1, 2)
+        self.setCenterLayout.addWidget(self.yInput, centerLayoutRowIndex, 2, 1, 2)
+        self.setCenterLayout.addWidget(QLabel("px"), centerLayoutRowIndex, 4, 1, 1)
+        # self.setCenterLayout.addLayout(self.xInputLayout)
+        # self.setCenterLayout.addLayout(self.yInputLayout)
+
+        # self.setCenterLayout.addWidget(self.updateBtn)
 
         # # Output boxes to show actual center values
         # self.xOutput = QLineEdit(f"{x:.2f}")
@@ -121,22 +150,68 @@ class AdjustCentDialog(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.imageCanvas)
-        self.layout.addLayout(self.inputLayout)
-        # self.layout.addLayout(self.outputLayout)
-        self.layout.addWidget(self.buttonBox)
-        self.setLayout(self.layout)
+        self.mainLayout = QVBoxLayout(self)
 
-        self.resize(1000, 1000 // 4 * 3)
+        self.imageLayout = QHBoxLayout()
+        self.imageLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.mainLayout.addLayout(self.imageLayout)
+
+        self.optionsLayout = QVBoxLayout()
+
+        self.displayOptGrpBx = QGroupBox("Display Options")
+        self.dispOptLayout = QGridLayout(self.displayOptGrpBx)
+        self.doubleZoom = QCheckBox("Double Zoom")
+
+        self.dispOptLayoutRowIndex = 0
+        self.dispOptLayout.addWidget(self.doubleZoom, self.dispOptLayoutRowIndex, 0, 1, 4)
+        self.dispOptLayoutRowIndex += 1
+
+        self.optionsLayout.addWidget(self.displayOptGrpBx)
+        self.optionsLayout.addSpacing(10)
+        self.optionsLayout.addWidget(self.setCenterGroup)
+        self.optionsLayout.addStretch()
+
+        self.imageLayout.addWidget(self.imageCanvas)
+
+        self.scroll_areaImg = QScrollArea()
+        self.imageLayout.addWidget(self.scroll_areaImg)
+
+        self.scroll_areaImg.setWidgetResizable(True)
+
+        self.frameOfKeys = QFrame()
+        self.frameOfKeys.setFixedWidth(500)
+        self.frameOfKeys.setLayout(self.optionsLayout)
+        self.scroll_areaImg.setWidget(self.frameOfKeys)
+        self.scroll_areaImg.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        # self.mainLayout.addLayout(self.outputLayout)
+        self.mainLayout.addWidget(self.buttonBox)
+        # self.mainLayout.setAlignment(Qt.AlignCenter)
+        self.mainLayout.setAlignment(self.buttonBox, Qt.AlignCenter)
+
+        self.doubleZoomGUI = DoubleZoom(self.imageFigure, dontShowMessage=True)
+
+        # pixels
+        # self.imageCanvas.setMinimumSize(800, 600)
+        # self.imageCanvas.setSizePolicy(
+        #     QSizePolicy.Expanding, QSizePolicy.Expanding
+        # )
+
+        self.setMinimumSize(700, 500)
+        self.resize(1200, 1000 // 4 * 3)
+
+        self.imageFigure.tight_layout()
+        self.imageCanvas.draw()
 
         self.createConnections()
 
     def createConnections(self):
         self.imageFigure.canvas.mpl_connect('button_press_event', self.imageClicked)
-        # self.imageFigure.canvas.mpl_connect('motion_notify_event', self.imageOnMotion)
+        self.imageFigure.canvas.mpl_connect('motion_notify_event', self.imageOnMotion)
         # self.imageFigure.canvas.mpl_connect('button_release_event', self.imageReleased)
         # self.imageFigure.canvas.mpl_connect('scroll_event', self.imgScrolled)
+        self.doubleZoom.stateChanged.connect(self.doubleZoomChecked)
 
     def keyPressEvent(self, event):
         if event.key() in [Qt.Key_Return, Qt.Key_Enter]:
@@ -145,18 +220,42 @@ class AdjustCentDialog(QDialog):
         super().keyPressEvent(event)
 
     def imageClicked(self, event):
-        if event.inaxes != self.imageAxes:
-            return
+        x = event.xdata
+        y = event.ydata
 
-        self.center = (event.xdata, event.ydata)
-        self.refreshCenter(updateText=True)
+        if event.inaxes == self.imageAxes:
+            print("imageAxes clicked!")
+            if self.doubleZoom.isChecked():
+                # print(f"doubleZoomMode: {self.doubleZoomGUI.doubleZoomMode}")
+                if self.doubleZoomGUI.doubleZoomMode:
+                    # set self.doubleZoomMode = False
+                    self.doubleZoomGUI.mouseClickBehavior(x, y)
+
+                    self.center = (x, y)
+                    self.refreshCenter(updateText=True)
+
+            else:
+                self.center = (x, y)
+                self.refreshCenter(updateText=True)
+
+        elif event.inaxes == self.doubleZoomGUI.axes:
+            print("doubleZoomGUI clicked!")
+            if self.doubleZoom.isChecked():
+                # if not self.doubleZoomGUI.doubleZoomMode:
+                x, y = self.doubleZoomGUI.doubleZoomToOrigCoord(x, y)
+                self.doubleZoomGUI.doubleZoomMode = True
+
+                self.center = (x, y)
+                self.refreshCenter(updateText=True)
+
 
     def refreshCenter(self, updateText=False):
         x, y = self.center
 
+        ax = self.imageAxes
+
         # Remove old lines
-        self.vline.remove()
-        self.hline.remove()
+        self.remove_image_lines()
 
         # Draw new lines
         self.vline = self.imageAxes.axvline(x, color='y')
@@ -169,10 +268,80 @@ class AdjustCentDialog(QDialog):
             # self.xOutput.setText(f"{x:.2f}")
             # self.yOutput.setText(f"{y:.2f}")
 
-        self.imageCanvas.draw_idle()
+        # self.imageFigure.tight_layout()
+        self.imageCanvas.draw()
 
     def updateCenterFromInput(self):
-            x = float(self.xInput.text())
-            y = float(self.yInput.text())
-            self.center = (x, y)
-            self.refreshCenter(updateText=False)
+        x = float(self.xInput.text())
+        y = float(self.yInput.text())
+        self.center = (x, y)
+        self.refreshCenter(updateText=False)
+
+    def doubleZoomChecked(self):
+        """
+        Triggered when double zoom is checked
+        """
+        self.doubleZoomGUI.doubleZoomChecked(
+            img=self.img,
+            canv=self.imageCanvas,
+            center=self.center,
+            is_checked=self.doubleZoom.isChecked(),
+            isLogScale=self.isLogScale,
+            vmin=self.vmin,
+            vmax=self.vmax
+        )
+
+    def imageOnMotion(self, event):
+        x = event.xdata
+        y = event.ydata
+        ax = self.imageAxes
+
+        if self.doubleZoom.isChecked():
+            if event.inaxes == self.doubleZoomGUI.axes:
+                if not self.doubleZoomGUI.doubleZoomMode:
+                    # Draw cursor location in zoom using red cross lines.
+                    self.doubleZoomGUI.updateAxes(x, y)
+
+                    self.imageCanvas.draw_idle()
+
+            elif event.inaxes == self.imageAxes:
+                if self.doubleZoomGUI.doubleZoomMode:
+                    # Draw cursor location in image using blue dot.
+                    self.doubleZoomGUI.beginImgMotion(x, y, self.img.shape[1], self.img.shape[0], (0, 0), self.imageAxes)
+
+                    # Update sursor area in zoom
+                    self.doubleZoomGUI.mouseHoverBehavior(
+                        x,
+                        y,
+                        self.img,
+                        self.imageCanvas,
+                        self.doubleZoom.isChecked(),
+                        isLogScale=self.isLogScale,
+                        vmin=self.vmin,
+                        vmax=self.vmax
+                    )
+
+        else:
+            if event.inaxes == self.imageAxes:
+                # Remove old lines
+                self.remove_image_lines(labels=["Red Dot"])
+                # Draw cursor location in image using red cross lines.
+                axis_size = 5
+
+                ax.plot((x - axis_size, x + axis_size), (y - axis_size, y + axis_size), color='r', label="Red Dot")
+                ax.plot((x - axis_size, x + axis_size), (y + axis_size, y - axis_size), color='r', label="Red Dot")
+
+                self.imageCanvas.draw_idle()
+
+    def remove_image_lines(self, labels=None):
+        ax = self.imageAxes
+
+        for i in range(len(ax.lines)-1, -1, -1):
+            if labels:
+                if ax.lines[i].get_label() in labels:
+                    ax.lines[i].remove()
+            else:
+                ax.lines[i].remove()
+
+        for i in range(len(ax.patches)-1, -1, -1):
+            ax.patches[i].remove()

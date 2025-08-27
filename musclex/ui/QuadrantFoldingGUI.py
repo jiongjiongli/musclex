@@ -52,6 +52,7 @@ from .ImageMaskTool import ImageMaskerWindow
 # from .DoubleZoomGUI import DoubleZoom
 from .DoubleZoomViewer import DoubleZoom
 from .AdjustCentDialog import AdjustCentDialog
+from .AdjustAngleDialog import AdjustAngleDialog
 from ..CalibrationSettings import CalibrationSettings
 from threading import Lock
 from scipy.ndimage import rotate
@@ -250,6 +251,8 @@ class QuadrantFoldingGUI(QMainWindow):
         self.imageMaskingTool = None
 
         self.adjustCentDialog = None
+
+        self.adjustAngleDialog = None
 
         self.rotationAngle = None
 
@@ -505,7 +508,7 @@ class QuadrantFoldingGUI(QMainWindow):
         rotationAngleRowIndex = 0
         self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
-        self.rotationAngleLayout.addWidget(self.adjustAngleBtn, centerLayoutRowIndex, 0, 1, 4)
+        self.rotationAngleLayout.addWidget(self.adjustAngleBtn, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
         self.rotationAngleLayout.addWidget(self.rotationAngleLabel, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
@@ -1855,10 +1858,11 @@ class QuadrantFoldingGUI(QMainWindow):
 
     def adjustCentBtnClicked(self):
         if self.quadFold:
-            img = self.quadFold.orig_img
-            center = self.quadFold.info.get('center')
+            curr_img = self.quadFold.orig_img
+            center = self.quadFold.get_latest_center()
 
-            if (img is not None) and center:
+            if (curr_img is not None) and center:
+                img = curr_img.copy()
                 self.adjustCentDialog = AdjustCentDialog(self,
                     img,
                     center,
@@ -1923,7 +1927,32 @@ class QuadrantFoldingGUI(QMainWindow):
             self.resetStatusbar()
 
     def adjustAngleBtnClicked(self):
-        pass
+        if self.quadFold:
+            curr_img = self.quadFold.orig_img
+            center = self.quadFold.get_latest_center()
+            angle = self.quadFold.get_latest_angle()
+
+            if (curr_img is not None) and center and (angle is not None):
+                img = curr_img.copy()
+                self.adjustAngleDialog = AdjustAngleDialog(self,
+                    img,
+                    center,
+                    angle,
+                    isLogScale=self.logScaleIntChkBx.isChecked(),
+                    vmin=self.spminInt.value(),
+                    vmax=self.spmaxInt.value()
+                )
+                dialogCode = self.adjustAngleDialog.exec()
+
+                # print(f"adjustAngleDialog dialogCode: {dialogCode}")
+
+                if dialogCode == QDialog.Accepted:
+                    angle = self.adjustAngleDialog.angle
+                    self.setAngle(angle, "AdjustAngleDialog")
+                    self.processImage()
+                else:
+                    assert dialogCode == QDialog.Rejected, f"AdjustAngleDialog closed with unexpected code:{dialogCode}"
+
 
     def calibrationClicked(self):
         """
@@ -4008,11 +4037,10 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 self.setCentByChords.setCheckable(True)
                 self.setCentByPerp.setCheckable(True)
-                self.adjustCentBtn.setCheckable(True)
+
                 self.setCenterRotationButton.setCheckable(True)
 
                 self.setRotationButton.setCheckable(True)
-                self.adjustAngleBtn.setCheckable(True)
 
                 self.resetWidgets()
                 QApplication.restoreOverrideCursor()

@@ -34,10 +34,10 @@ from musclex import __version__
 
 class DoubleZoom:
 
-    def __init__(self, img_fig):
+    def __init__(self, img_fig, dontShowMessage=False):
         self.axes = None
         self.doubleZoomEnabled = False
-        self.dontShowAgainDoubleZoomMessageResult = False
+        self.dontShowAgainDoubleZoomMessageResult = dontShowMessage
         self.mousePosHist = []
         self.doubleZoomPoint = (0, 0)
         self.mouseSensitivity = 1.0
@@ -268,8 +268,8 @@ class DoubleZoom:
             ax1.plot((x - axis_size, x + axis_size), (y - axis_size, y + axis_size), color='r')
             ax1.plot((x - axis_size, x + axis_size), (y + axis_size, y - axis_size), color='r')
 
-    def updateAxes(self, x, y):
-        if (not self.doubleZoomMode) and x < 200 and y < 200:
+    def updateAxes(self, x, y, checkZoomMode=True):
+        if (not (checkZoomMode and self.doubleZoomMode)) and 1 < x < 200 and 1 < y < 200:
             self.updateAxesInner(x, y)
 
     def beginImgMotion(self, x, y, img_width, img_height, extent, img_axes):
