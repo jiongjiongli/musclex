@@ -104,20 +104,31 @@ class AdjustAngleDialog(QDialog):
         self.vline = self.imageAxes.axvline(x, color='y')
         self.hline = self.imageAxes.axhline(y, color='y')
 
+        self.rotate45Btn = QPushButton("Rotate 45°")
+        self.rotate90Btn = QPushButton("Rotate 90°")
+        self.rotate180Btn = QPushButton("Rotate 180°")
+
         self.angleSpnBox = QDoubleSpinBox()
         self.angleSpnBox.setSuffix("°")
         self.angleSpnBox.setDecimals(2)
         self.angleSpnBox.setSingleStep(1)
-        self.angleSpnBox.setValue(self.angle_to_origin % 360)
         self.angleSpnBox.setRange(0, 360)
+        self.angleSpnBox.setValue(self.angle_to_origin % 360)
         self.angleSpnBox.setKeyboardTracking(False)
 
-        self.setAngleGroup = QGroupBox("Set Angle")
+        self.setAngleGroup = QGroupBox("Set Angle (Clockwise)")
         self.setAngleLayout = QGridLayout(self.setAngleGroup)
 
         angleLayoutRowIndex = 0
-        self.setAngleLayout.addWidget(QLabel("Clockwise Rotation Angle (Original coords): "), angleLayoutRowIndex, 0, 1, 2)
+        self.setAngleLayout.addWidget(self.rotate45Btn,  angleLayoutRowIndex, 0, 1, 4)
+        angleLayoutRowIndex += 1
+        self.setAngleLayout.addWidget(self.rotate90Btn,  angleLayoutRowIndex, 0, 1, 4)
+        angleLayoutRowIndex += 1
+        self.setAngleLayout.addWidget(self.rotate180Btn, angleLayoutRowIndex, 0, 1, 4)
+        angleLayoutRowIndex += 1
+        self.setAngleLayout.addWidget(QLabel("Rotation Angle (Original coords): "), angleLayoutRowIndex, 0, 1, 2)
         self.setAngleLayout.addWidget(self.angleSpnBox, angleLayoutRowIndex, 2, 1, 2)
+        angleLayoutRowIndex += 1
 
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
@@ -175,6 +186,10 @@ class AdjustAngleDialog(QDialog):
         self.createConnections()
 
     def createConnections(self):
+        self.rotate45Btn.clicked.connect(lambda: self.increment_angle(45))
+        self.rotate90Btn.clicked.connect(lambda: self.increment_angle(90))
+        self.rotate180Btn.clicked.connect(lambda: self.increment_angle(180))
+
         self.angleSpnBox.editingFinished.connect(self.UpdateAngle)
         self.angleSpnBox.valueChanged.connect(self.UpdateAngle)
 
@@ -188,6 +203,10 @@ class AdjustAngleDialog(QDialog):
         angle =  self.angleSpnBox.value() - self.angle_to_origin
         return angle
 
+    def increment_angle(self, step):
+        new_angle = (self.angleSpnBox.value() + step) % 360
+        self.angleSpnBox.setValue(new_angle)
+        self.UpdateAngle()
 
     def UpdateAngle(self):
         x, y = self.center
