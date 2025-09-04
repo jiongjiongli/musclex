@@ -3285,7 +3285,7 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.uiUpdating = False
 
-    def onImageChanged(self, reprocess=False, imageProcessed=False):
+    def onImageChanged(self, reprocess=False):
         """
         Need to be called when image is change i.e. to the next image.
         This will create a new QuadrantFolder object for the new image and syncUI if cache is available
@@ -3318,8 +3318,7 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.persistRotation.isChecked():
             self.quadFold.info['manual_rotationAngle'] = self.rotationAngle
 
-        if not imageProcessed:
-            self.processImage()
+        self.processImage()
 
 
     def onFoldChkBoxToggled(self):
@@ -4080,7 +4079,15 @@ class QuadrantFoldingGUI(QMainWindow):
                         self.browseFile()
                 self.h5List = []
                 self.setH5Mode(str(newFile))
-                self.onImageChanged(imageProcessed=imageProcessed)
+                if imageProcessed:
+                    self.filenameLineEdit.setText(fileName)
+                    self.filenameLineEdit2.setText(fileName)
+                    original_image = self.quadFold.orig_img
+                    self.imgDetailOnStatusBar.setText(str(original_image.shape[0]) + 'x' + str(original_image.shape[1]) + ' : ' + str(original_image.dtype))
+                    self.initialWidgets(original_image, None)
+                    self.refreshAllTabs()
+                else:
+                    self.onImageChanged()
             else:
                 QApplication.restoreOverrideCursor()
                 self.browseFile()
