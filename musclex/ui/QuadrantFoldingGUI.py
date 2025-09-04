@@ -4023,7 +4023,11 @@ class QuadrantFoldingGUI(QMainWindow):
         if self.filePath is not None and self.imgList is not None and self.imgList:
             try:
                 self.csvManager = QF_CSVManager(self.filePath)
-            except Exception:
+            except Exception as e:
+                print("Exception occurred:", e)
+                tb_str = traceback.format_exc()
+                print(f"Full traceback: {tb_str}\n")
+
                 msg = QMessageBox()
                 msg.setInformativeText(
                     "Permission denied when creating a folder at " + self.filePath + ". Please check the folder permissions.")
@@ -4031,6 +4035,7 @@ class QuadrantFoldingGUI(QMainWindow):
                 msg.setWindowTitle("Error Creating CSVManager")
                 msg.setStyleSheet("QLabel{min-width: 500px;}")
                 msg.exec_()
+                return "Retry"
             if self.csvManager is not None:
                 self.numberOfFiles = len(self.imgList)
                 self.ignoreFolds = set()
@@ -4076,7 +4081,7 @@ class QuadrantFoldingGUI(QMainWindow):
                         infMsg.setStandardButtons(QMessageBox.Ok)
                         infMsg.setIcon(QMessageBox.Information)
                         infMsg.exec_()
-                        self.browseFile()
+                        return "Retry"
                 self.h5List = []
                 self.setH5Mode(str(newFile))
                 if imageProcessed:
@@ -4090,10 +4095,12 @@ class QuadrantFoldingGUI(QMainWindow):
                     self.onImageChanged()
             else:
                 QApplication.restoreOverrideCursor()
-                self.browseFile()
+                return "Retry"
         else:
             QApplication.restoreOverrideCursor()
-            self.browseFile()
+            return "Retry"
+
+        return "Success"
 
     def setH5Mode(self, file_name):
         """
@@ -4400,10 +4407,18 @@ class QuadrantFoldingGUI(QMainWindow):
         Popup input dialog and set file selection
         """
         self.newProcess = True
-        file_name = getAFile()
-        if file_name != "":
-            self.onNewFileSelected(str(file_name))
-            self.centralWidget.setMinimumSize(700, 500)
+
+        success = False
+
+        while not success:
+            file_name = getAFile()
+            if file_name != "":
+                result = self.onNewFileSelected(str(file_name))
+
+                success = result != "Retry"
+
+                if success:
+                    self.centralWidget.setMinimumSize(700, 500)
 
     def saveSettings(self):
         """
