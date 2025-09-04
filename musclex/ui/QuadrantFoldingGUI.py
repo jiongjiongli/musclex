@@ -3285,7 +3285,7 @@ class QuadrantFoldingGUI(QMainWindow):
 
         self.uiUpdating = False
 
-    def onImageChanged(self, reprocess=False):
+    def onImageChanged(self, reprocess=False, imageProcessed=False):
         """
         Need to be called when image is change i.e. to the next image.
         This will create a new QuadrantFolder object for the new image and syncUI if cache is available
@@ -3317,7 +3317,9 @@ class QuadrantFoldingGUI(QMainWindow):
                 self.quadFold.deleteFromDict(self.quadFold.imgCache, 'BgSubFold')
         if self.persistRotation.isChecked():
             self.quadFold.info['manual_rotationAngle'] = self.rotationAngle
-        self.processImage()
+
+        if not imageProcessed:
+            self.processImage()
 
 
     def onFoldChkBoxToggled(self):
@@ -4047,6 +4049,9 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 self.resetWidgets()
                 QApplication.restoreOverrideCursor()
+
+                imageProcessed = False
+
                 if self.h5List == []:
                     fileName = self.imgList[self.currentFileNumber]
                     try:
@@ -4059,6 +4064,7 @@ class QuadrantFoldingGUI(QMainWindow):
                             self.deleteImgCache(['BgSubFold'])
                             self.quadFold.info['manual_center'] = [self.calSettingsDialog.centerX.value(), self.calSettingsDialog.centerY.value()]
                             self.processImage()
+                            imageProcessed = True
 
                     except Exception as e:
                         print("Exception occurred:", e)
@@ -4074,7 +4080,7 @@ class QuadrantFoldingGUI(QMainWindow):
                         self.browseFile()
                 self.h5List = []
                 self.setH5Mode(str(newFile))
-                self.onImageChanged()
+                self.onImageChanged(imageProcessed=imageProcessed)
             else:
                 QApplication.restoreOverrideCursor()
                 self.browseFile()

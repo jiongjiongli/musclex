@@ -28,6 +28,8 @@ authorization from Illinois Institute of Technology.
 
 import sys
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.backend_bases import MouseButton
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.colors import LogNorm, Normalize, ListedColormap
 
@@ -45,6 +47,8 @@ from PySide6.QtWidgets import (
     QFrame,
     QScrollArea,
     QGroupBox,
+    QSpinBox,
+    QDoubleSpinBox,
     QLineEdit,
     QSizePolicy,
 )
@@ -70,6 +74,15 @@ class AdjustCentDialog(QDialog):
         self.isLogScale = isLogScale
         self.vmin = vmin
         self.vmax = vmax
+
+        self.function = None
+        self.mouse_pressed = False
+        self.dragging = False
+        self.press_x = None
+        self.press_y = None
+        self.last_drag_x = None
+        self.last_drag_y = None
+
         x, y = self.center
 
         self.imageFigure = plt.figure()
@@ -99,14 +112,6 @@ class AdjustCentDialog(QDialog):
 
         self.xInput = QLineEdit(f"{x:.2f}")
         self.yInput = QLineEdit(f"{y:.2f}")
-        # self.updateBtn = QPushButton("Update Center")
-        # self.updateBtn.clicked.connect(self.updateCenterFromInput)
-
-        # Update center immediately when losing focus or pressing enter, without closing dialog
-        self.xInput.returnPressed.connect(self.updateCenterFromInput)
-        self.yInput.returnPressed.connect(self.updateCenterFromInput)
-        self.xInput.editingFinished.connect(self.updateCenterFromInput)
-        self.yInput.editingFinished.connect(self.updateCenterFromInput)
 
         self.setCenterGroup = QGroupBox("Set Center")
         self.setCenterLayout = QGridLayout(self.setCenterGroup)
@@ -161,9 +166,54 @@ class AdjustCentDialog(QDialog):
 
         self.displayOptGrpBx = QGroupBox("Display Options")
         self.dispOptLayout = QGridLayout(self.displayOptGrpBx)
+
+        self.minIntLabel = QLabel('Min Intensity')
+        self.maxIntLabel = QLabel('Max Intensity')
+
+        self.spminInt = QDoubleSpinBox()
+        self.spminInt.setToolTip("Reduction in the maximal intensity shown to allow for more details in the image.")
+        self.spminInt.setKeyboardTracking(False)
+        # self.spminInt.setSingleStep(5)
+
+        self.spmaxInt = QDoubleSpinBox()
+        self.spmaxInt.setToolTip("Increase in the minimal intensity shown to allow for more details in the image.")
+        self.spmaxInt.setKeyboardTracking(False)
+        # self.spmaxInt.setSingleStep(5)
+
+        min_val = self.img.min()
+        max_val = self.img.max()
+        self.spminInt.setRange(min_val, max_val)
+        self.spmaxInt.setRange(min_val, max_val)
+
+        self.spminInt.setSingleStep(max_val * .05)
+        self.spmaxInt.setSingleStep(max_val * .05)
+
+        self.spminInt.setValue(self.vmin)
+        self.spmaxInt.setValue(self.vmax)
+
+        self.spminInt.setDecimals(2)
+        self.spmaxInt.setDecimals(2)
+
+        self.logScaleIntChkBx = QCheckBox("Log scale intensity")
+        self.logScaleIntChkBx.setChecked(self.isLogScale)
+
+        self.imgZoomInBtn = QPushButton("Zoom in")
+        self.imgZoomInBtn.setCheckable(True)
+        self.imgZoomOutBtn = QPushButton("Full")
         self.doubleZoom = QCheckBox("Double Zoom")
 
         self.dispOptLayoutRowIndex = 0
+        self.dispOptLayout.addWidget(self.minIntLabel, self.dispOptLayoutRowIndex, 0, 1, 2)
+        self.dispOptLayout.addWidget(self.maxIntLabel, self.dispOptLayoutRowIndex, 2, 1, 2)
+        self.dispOptLayoutRowIndex += 1
+        self.dispOptLayout.addWidget(self.spminInt, self.dispOptLayoutRowIndex, 0, 1, 2)
+        self.dispOptLayout.addWidget(self.spmaxInt, self.dispOptLayoutRowIndex, 2, 1, 2)
+        self.dispOptLayoutRowIndex += 1
+        self.dispOptLayout.addWidget(self.logScaleIntChkBx, self.dispOptLayoutRowIndex, 0, 1, 2)
+        self.dispOptLayoutRowIndex += 1
+        self.dispOptLayout.addWidget(self.imgZoomInBtn, self.dispOptLayoutRowIndex, 0, 1, 2)
+        self.dispOptLayout.addWidget(self.imgZoomOutBtn, self.dispOptLayoutRowIndex, 2, 1, 2)
+        self.dispOptLayoutRowIndex += 1
         self.dispOptLayout.addWidget(self.doubleZoom, self.dispOptLayoutRowIndex, 0, 1, 4)
         self.dispOptLayoutRowIndex += 1
 
@@ -207,89 +257,51 @@ class AdjustCentDialog(QDialog):
         self.createConnections()
 
     def createConnections(self):
-        self.imageFigure.canvas.mpl_connect('button_press_event', self.imageClicked)
+        self.imgZoomInBtn.clicked.connect(self.imageZoomIn)
+        self.imgZoomOutBtn.clicked.connect(self.imageZoomOut)
+        self.imageFigure.canvas.mpl_connect('button_press_event', self.imagePressed)
         self.imageFigure.canvas.mpl_connect('motion_notify_event', self.imageOnMotion)
-        # self.imageFigure.canvas.mpl_connect('button_release_event', self.imageReleased)
-        # self.imageFigure.canvas.mpl_connect('scroll_event', self.imgScrolled)
+        self.imageFigure.canvas.mpl_connect('button_release_event', self.imageReleased)
+        self.imageFigure.canvas.mpl_connect('scroll_event', self.imgScrolled)
         self.doubleZoom.stateChanged.connect(self.doubleZoomChecked)
 
+        self.spminInt.valueChanged.connect(
+            lambda vmin: self.updateImageMinMax(vmin=vmin))
+        self.spmaxInt.valueChanged.connect(
+            lambda vmax: self.updateImageMinMax(vmax=vmax))
+        self.logScaleIntChkBx.stateChanged.connect(self.ImageScaleChecked)
+
+        # Update center immediately when losing focus or pressing enter, without closing dialog
+        self.xInput.returnPressed.connect(self.updateCenterFromInput)
+        self.yInput.returnPressed.connect(self.updateCenterFromInput)
+        self.xInput.editingFinished.connect(self.updateCenterFromInput)
+        self.yInput.editingFinished.connect(self.updateCenterFromInput)
+
     def keyPressEvent(self, event):
-        if event.key() in [Qt.Key_Return, Qt.Key_Enter]:
+        key = event.key()
+        if key in [Qt.Key_Return, Qt.Key_Enter]:
             return
+
+        if key == Qt.Key_Escape:
+            self.function = None
+            self.imgZoomInBtn.setChecked(False)
 
         super().keyPressEvent(event)
 
-    def imageClicked(self, event):
+    def imagePressed(self, event):
+        if event.button != MouseButton.LEFT:
+            return
+
         x = event.xdata
         y = event.ydata
 
         if event.inaxes == self.imageAxes:
-            print("imageAxes clicked!")
-            if self.doubleZoom.isChecked():
-                # print(f"doubleZoomMode: {self.doubleZoomGUI.doubleZoomMode}")
-                if self.doubleZoomGUI.doubleZoomMode:
-                    # set self.doubleZoomMode = False
-                    self.doubleZoomGUI.mouseClickBehavior(x, y)
-
-                    self.center = (x, y)
-                    self.refreshCenter(updateText=True)
-
-            else:
-                self.center = (x, y)
-                self.refreshCenter(updateText=True)
-
-        elif event.inaxes == self.doubleZoomGUI.axes:
-            print("doubleZoomGUI clicked!")
-            if self.doubleZoom.isChecked():
-                # if not self.doubleZoomGUI.doubleZoomMode:
-                x, y = self.doubleZoomGUI.doubleZoomToOrigCoord(x, y)
-                self.doubleZoomGUI.doubleZoomMode = True
-
-                self.center = (x, y)
-                self.refreshCenter(updateText=True)
-
-
-    def refreshCenter(self, updateText=False):
-        x, y = self.center
-
-        ax = self.imageAxes
-
-        # Remove old lines
-        self.remove_image_lines()
-
-        # Draw new lines
-        self.vline = self.imageAxes.axvline(x, color='y')
-        self.hline = self.imageAxes.axhline(y, color='y')
-
-        if updateText:
-            # Update input output
-            self.xInput.setText(f"{x:.2f}")
-            self.yInput.setText(f"{y:.2f}")
-            # self.xOutput.setText(f"{x:.2f}")
-            # self.yOutput.setText(f"{y:.2f}")
-
-        # self.imageFigure.tight_layout()
-        self.imageCanvas.draw()
-
-    def updateCenterFromInput(self):
-        x = float(self.xInput.text())
-        y = float(self.yInput.text())
-        self.center = (x, y)
-        self.refreshCenter(updateText=False)
-
-    def doubleZoomChecked(self):
-        """
-        Triggered when double zoom is checked
-        """
-        self.doubleZoomGUI.doubleZoomChecked(
-            img=self.img,
-            canv=self.imageCanvas,
-            center=self.center,
-            is_checked=self.doubleZoom.isChecked(),
-            isLogScale=self.isLogScale,
-            vmin=self.vmin,
-            vmax=self.vmax
-        )
+            self.mouse_pressed = True
+            self.dragging = False
+            self.press_x = x
+            self.press_y = y
+            self.last_drag_x = x
+            self.last_drag_y = y
 
     def imageOnMotion(self, event):
         x = event.xdata
@@ -301,7 +313,6 @@ class AdjustCentDialog(QDialog):
                 if not self.doubleZoomGUI.doubleZoomMode:
                     # Draw cursor location in zoom using red cross lines.
                     self.doubleZoomGUI.updateAxes(x, y)
-
                     self.imageCanvas.draw_idle()
 
             elif event.inaxes == self.imageAxes:
@@ -323,6 +334,45 @@ class AdjustCentDialog(QDialog):
 
         else:
             if event.inaxes == self.imageAxes:
+                # If moved enough, switch to dragging mode
+                move_threshold = 2.0  # pixels in data coords
+                if self.mouse_pressed:
+                    if not self.dragging:
+                        dx = abs(x - self.press_x)
+                        dy = abs(y - self.press_y)
+                        if dx > move_threshold or dy > move_threshold:
+                            self.dragging = True
+
+                    # Perform dragging
+                    if self.dragging:
+                        dx = x - self.last_drag_x
+                        dy = y - self.last_drag_y
+
+                        xlim = self.imageAxes.get_xlim()
+                        ylim = self.imageAxes.get_ylim()
+
+                        left = xlim[0] - dx
+                        right = xlim[1] - dx
+                        bottom = ylim[0] - dy
+                        top = ylim[1] - dy
+
+                        # left = min(max(left, 0), self.img.shape[1])
+                        # right = min(max(right, 0), self.img.shape[1])
+                        # bottom = min(max(bottom, 0), self.img.shape[0])
+                        # top = min(max(top, 0), self.img.shape[0])
+
+                        inImage = ((0 <= left < self.img.shape[1])
+                            and (0 <= right < self.img.shape[1])
+                            and (0 <= bottom < self.img.shape[0])
+                            and (0 <= top < self.img.shape[0]))
+
+                        if inImage:
+                            self.imageAxes.set_xlim(left, right)
+                            self.imageAxes.set_ylim(bottom, top)
+
+                        self.last_drag_x = x
+                        self.last_drag_y = y
+
                 # Remove old lines
                 self.remove_image_lines(labels=["Red Dot"])
                 # Draw cursor location in image using red cross lines.
@@ -331,7 +381,191 @@ class AdjustCentDialog(QDialog):
                 ax.plot((x - axis_size, x + axis_size), (y - axis_size, y + axis_size), color='r', label="Red Dot")
                 ax.plot((x - axis_size, x + axis_size), (y + axis_size, y - axis_size), color='r', label="Red Dot")
 
+                if self.function and len(self.function) == 2 and self.function[0] == "im_zoomin":
+                    # draw rectangle
+
+                    start_pt = self.function[1]
+                    w = abs(start_pt[0] - x)
+                    h = abs(start_pt[1] - y)
+                    x = min(start_pt[0], x)
+                    y = min(start_pt[1], y)
+                    ax.add_patch(patches.Rectangle((x, y), w, h,
+                                                linewidth=1, edgecolor='r', facecolor='none', linestyle='dotted'))
+
                 self.imageCanvas.draw_idle()
+
+    def imageReleased(self, event):
+        x = event.xdata
+        y = event.ydata
+
+        if event.button != MouseButton.LEFT:
+            return
+
+        # If moved enough, switch to dragging mode
+        move_threshold = 2.0  # pixels in data coords
+
+        if event.inaxes == self.imageAxes:
+            print("imageAxes clicked!")
+
+            if self.mouse_pressed:
+                if not self.dragging:
+                    dx = abs(x - self.press_x)
+                    dy = abs(y - self.press_y)
+                    if dx > move_threshold or dy > move_threshold:
+                        self.dragging = True
+
+                if not self.dragging:
+                    # print("imageAxes clicked!")
+                    if self.doubleZoom.isChecked():
+                        # print(f"doubleZoomMode: {self.doubleZoomGUI.doubleZoomMode}")
+                        if self.doubleZoomGUI.doubleZoomMode:
+                            # set self.doubleZoomMode = False
+                            self.doubleZoomGUI.mouseClickBehavior(x, y)
+
+                            self.center = (x, y)
+                            self.refreshCenter(updateText=True)
+
+                    else:
+                        if self.function and self.function[0] == "im_zoomin":
+                            self.function.append((x, y))
+                            if len(self.function) == 3:
+                                p1 = self.function[1]
+                                p2 = self.function[2]
+                                img_zoom = [(min(p1[0], p2[0]), max(p1[0], p2[0])), (min(p1[1], p2[1]), max(p1[1], p2[1]))]
+                                self.function = None
+                                self.imgZoomInBtn.setChecked(False)
+                                self.resizeImage(img_zoom)
+                                self.refreshCenter()
+                        else:
+                            self.center = (x, y)
+                            self.refreshCenter(updateText=True)
+
+        elif event.inaxes == self.doubleZoomGUI.axes:
+            print("doubleZoomGUI clicked!")
+
+            if self.doubleZoom.isChecked():
+                # if not self.doubleZoomGUI.doubleZoomMode:
+                x, y = self.doubleZoomGUI.doubleZoomToOrigCoord(x, y)
+                self.doubleZoomGUI.doubleZoomMode = True
+
+                self.center = (x, y)
+                self.refreshCenter(updateText=True)
+
+        # Reset state
+        self.mouse_pressed = False
+        self.dragging = False
+        self.press_x = None
+        self.press_y = None
+        self.last_drag_x = None
+        self.last_drag_y = None
+
+    def imgScrolled(self, event):
+        if event.inaxes != self.imageAxes:
+            return
+        base_scale = 1.2  # zoom factor
+        if event.button == 'up':   # scroll up to zoom in
+            scale_factor = 1 / base_scale
+        elif event.button == 'down':  # scroll down to zoom out
+            scale_factor = base_scale
+        else:
+            return
+
+        xdata, ydata = event.xdata, event.ydata
+        xlim = self.imageAxes.get_xlim()
+        ylim = self.imageAxes.get_ylim()
+
+        new_width = (xlim[1] - xlim[0]) * scale_factor
+        new_height = (ylim[1] - ylim[0]) * scale_factor
+
+        relx = (xdata - xlim[0]) / (xlim[1] - xlim[0])
+        rely = (ydata - ylim[0]) / (ylim[1] - ylim[0])
+
+        self.imageAxes.set_xlim([xdata - new_width * relx,
+                                 xdata + new_width * (1 - relx)])
+        self.imageAxes.set_ylim([ydata - new_height * rely,
+                                 ydata + new_height * (1 - rely)])
+        self.imageCanvas.draw_idle()
+
+    def updateImageMinMax(self, vmin=None, vmax=None):
+        if vmin is not None:
+            self.vmin = vmin
+        if vmax is not None:
+            self.vmax = vmax
+
+        self.redrawImage()
+
+    def ImageScaleChecked(self):
+        self.isLogScale = self.logScaleIntChkBx.isChecked()
+        self.redrawImage()
+
+    def redrawImage(self):
+        if self.isLogScale:
+            self.imageAxes.imshow(
+                self.img,
+                cmap="gray",
+                norm=LogNorm(vmin=max(1, self.vmin), vmax=self.vmax),
+            )
+        else:
+            self.imageAxes.imshow(
+                self.img,
+                cmap="gray",
+                norm=Normalize(vmin=self.vmin, vmax=self.vmax),
+            )
+
+        self.imageFigure.tight_layout()
+        self.imageCanvas.draw()
+
+
+    def resizeImage(self, img_zoom):
+        if img_zoom and len(img_zoom) == 2:
+            ax = self.imageAxes
+            ax.set_xlim(img_zoom[0])
+            ax.set_ylim(img_zoom[1])
+
+        self.imageFigure.tight_layout()
+        self.imageCanvas.draw_idle()
+
+    def refreshCenter(self, updateText=False):
+        x, y = self.center
+
+        ax = self.imageAxes
+
+        # Remove old lines
+        self.remove_image_lines()
+
+        # Draw new lines
+        self.vline = self.imageAxes.axvline(x, color='y')
+        self.hline = self.imageAxes.axhline(y, color='y')
+
+        if updateText:
+            # Update input output
+            self.xInput.setText(f"{x:.2f}")
+            self.yInput.setText(f"{y:.2f}")
+            # self.xOutput.setText(f"{x:.2f}")
+            # self.yOutput.setText(f"{y:.2f}")
+
+        self.imageFigure.tight_layout()
+        self.imageCanvas.draw_idle()
+
+    def updateCenterFromInput(self):
+        x = float(self.xInput.text())
+        y = float(self.yInput.text())
+        self.center = (x, y)
+        self.refreshCenter(updateText=False)
+
+    def doubleZoomChecked(self):
+        """
+        Triggered when double zoom is checked
+        """
+        self.doubleZoomGUI.doubleZoomChecked(
+            img=self.img,
+            canv=self.imageCanvas,
+            center=self.center,
+            is_checked=self.doubleZoom.isChecked(),
+            isLogScale=self.isLogScale,
+            vmin=self.vmin,
+            vmax=self.vmax
+        )
 
     def remove_image_lines(self, labels=None):
         ax = self.imageAxes
@@ -345,3 +579,21 @@ class AdjustCentDialog(QDialog):
 
         for i in range(len(ax.patches)-1, -1, -1):
             ax.patches[i].remove()
+
+    def imageZoomIn(self):
+        if self.imgZoomInBtn.isChecked():
+            ax = self.imageAxes
+            for i in range(len(ax.lines)-1,-1,-1):
+                ax.lines[i].remove()
+            for i in range(len(ax.patches)-1,-1,-1):
+                ax.patches[i].remove()
+            self.imageCanvas.draw_idle()
+            self.function = ["im_zoomin"]
+        else:
+            self.function = None
+
+    def imageZoomOut(self):
+        self.imgZoomInBtn.setChecked(False)
+        img_zoom = [(0, self.img.shape[1]), (0, self.img.shape[0])]
+        self.resizeImage(img_zoom)
+        self.refreshCenter()
