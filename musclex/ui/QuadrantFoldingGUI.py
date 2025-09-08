@@ -493,22 +493,21 @@ class QuadrantFoldingGUI(QMainWindow):
         self.fixedOrientationChkBx.setChecked(False)
 
         centerLayoutRowIndex = 0
-        self.setCenterLayout.addWidget(self.calibrationButton, centerLayoutRowIndex, 0, 1, 4)
+        self.setCenterLayout.addWidget(self.calibrationButton, centerLayoutRowIndex, 0, 1, 2)
+        self.setCenterLayout.addWidget(self.setCentBtn, centerLayoutRowIndex, 2, 1, 2)
         centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.setCentByChords, centerLayoutRowIndex, 0, 1, 2)
         self.setCenterLayout.addWidget(self.setCentByPerp, centerLayoutRowIndex, 2, 1, 2)
         centerLayoutRowIndex += 1
-        self.setCenterLayout.addWidget(self.setCentBtn, centerLayoutRowIndex, 0, 1, 4)
-        centerLayoutRowIndex += 1
+
         self.setCenterLayout.addWidget(self.imageCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.persistCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
 
         rotationAngleRowIndex = 0
-        self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 4)
-        rotationAngleRowIndex += 1
-        self.rotationAngleLayout.addWidget(self.setAngleBtn, rotationAngleRowIndex, 0, 1, 4)
+        self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 2)
+        self.rotationAngleLayout.addWidget(self.setAngleBtn, rotationAngleRowIndex, 2, 1, 2)
         rotationAngleRowIndex += 1
         self.rotationAngleLayout.addWidget(self.rotationAngleLabel, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
