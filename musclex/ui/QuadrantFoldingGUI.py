@@ -51,8 +51,8 @@ from .BlankImageSettings import BlankImageSettings
 from .ImageMaskTool import ImageMaskerWindow
 # from .DoubleZoomGUI import DoubleZoom
 from .DoubleZoomViewer import DoubleZoom
-from .AdjustCentDialog import AdjustCentDialog
-from .AdjustAngleDialog import AdjustAngleDialog
+from .SetCentDialog import SetCentDialog
+from .SetAngleDialog import SetAngleDialog
 from ..CalibrationSettings import CalibrationSettings
 from threading import Lock
 from scipy.ndimage import rotate
@@ -250,9 +250,9 @@ class QuadrantFoldingGUI(QMainWindow):
         self.qf_lock = Lock()
         self.imageMaskingTool = None
 
-        self.adjustCentDialog = None
+        self.setCentDialog = None
 
-        self.adjustAngleDialog = None
+        self.setAngleDialog = None
 
         self.rotationAngle = None
 
@@ -434,9 +434,9 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setCentByPerp.setCheckable(False)
         self.checkableButtons.append(self.setCentByPerp)
 
-        self.adjustCentBtn = QPushButton("Adjust Center Manually")
-        self.adjustCentBtn.setCheckable(False)
-        self.checkableButtons.append(self.adjustCentBtn)
+        self.setCentBtn = QPushButton("Set Center Manually")
+        self.setCentBtn.setCheckable(False)
+        self.checkableButtons.append(self.setCentBtn)
 
         self.rotationAngleGroup = QGroupBox("Set Rotation Angle")
         self.rotationAngleLayout = QGridLayout(self.rotationAngleGroup)
@@ -444,9 +444,9 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setRotationButton.setCheckable(False)
         self.checkableButtons.append(self.setRotationButton)
 
-        self.adjustAngleBtn = QPushButton("Adjust Angle Manually")
-        self.adjustAngleBtn.setCheckable(False)
-        self.checkableButtons.append(self.adjustAngleBtn)
+        self.setAngleBtn = QPushButton("Set Angle Manually")
+        self.setAngleBtn.setCheckable(False)
+        self.checkableButtons.append(self.setAngleBtn)
 
         self.imageCenter = QLabel()
 
@@ -498,7 +498,7 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setCenterLayout.addWidget(self.setCentByChords, centerLayoutRowIndex, 0, 1, 2)
         self.setCenterLayout.addWidget(self.setCentByPerp, centerLayoutRowIndex, 2, 1, 2)
         centerLayoutRowIndex += 1
-        self.setCenterLayout.addWidget(self.adjustCentBtn, centerLayoutRowIndex, 0, 1, 4)
+        self.setCenterLayout.addWidget(self.setCentBtn, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
         self.setCenterLayout.addWidget(self.imageCenter, centerLayoutRowIndex, 0, 1, 4)
         centerLayoutRowIndex += 1
@@ -508,7 +508,7 @@ class QuadrantFoldingGUI(QMainWindow):
         rotationAngleRowIndex = 0
         self.rotationAngleLayout.addWidget(self.setRotationButton, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
-        self.rotationAngleLayout.addWidget(self.adjustAngleBtn, rotationAngleRowIndex, 0, 1, 4)
+        self.rotationAngleLayout.addWidget(self.setAngleBtn, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
         self.rotationAngleLayout.addWidget(self.rotationAngleLabel, rotationAngleRowIndex, 0, 1, 4)
         rotationAngleRowIndex += 1
@@ -1269,8 +1269,8 @@ class QuadrantFoldingGUI(QMainWindow):
         self.setRotationButton.clicked.connect(self.setRotation)
         self.setCentByChords.clicked.connect(self.setCenterByChordsClicked)
         self.setCentByPerp.clicked.connect(self.setCenterByPerpClicked)
-        self.adjustCentBtn.clicked.connect(self.adjustCentBtnClicked)
-        self.adjustAngleBtn.clicked.connect(self.adjustAngleBtnClicked)
+        self.setCentBtn.clicked.connect(self.setCentBtnClicked)
+        self.setAngleBtn.clicked.connect(self.setAngleBtnClicked)
         self.maskThresSpnBx.valueChanged.connect(self.ignoreThresChanged)
         self.imageFigure.canvas.mpl_connect('button_press_event', self.imageClicked)
         self.imageFigure.canvas.mpl_connect('motion_notify_event', self.imageOnMotion)
@@ -1856,30 +1856,30 @@ class QuadrantFoldingGUI(QMainWindow):
             self.setCentByChords.setChecked(False)
             self.processImage()
 
-    def adjustCentBtnClicked(self):
+    def setCentBtnClicked(self):
         if self.quadFold:
             curr_img = self.quadFold.orig_img
             center = self.quadFold.get_latest_center()
 
             if (curr_img is not None) and center:
                 img = curr_img.copy()
-                self.adjustCentDialog = AdjustCentDialog(self,
+                self.setCentDialog = SetCentDialog(self,
                     img,
                     center,
                     isLogScale=self.logScaleIntChkBx.isChecked(),
                     vmin=self.spminInt.value(),
                     vmax=self.spmaxInt.value()
                 )
-                dialogCode = self.adjustCentDialog.exec()
+                dialogCode = self.setCentDialog.exec()
 
-                # print(f"AdjustCentDialog dialogCode: {dialogCode}")
+                # print(f"SetCentDialog dialogCode: {dialogCode}")
 
                 if dialogCode == QDialog.Accepted:
-                    center = self.adjustCentDialog.center
-                    self.setCenter(center, "AdjustCentDialog")
+                    center = self.setCentDialog.center
+                    self.setCenter(center, "SetCentDialog")
                     self.processImage()
                 else:
-                    assert dialogCode == QDialog.Rejected, f"AdjustCentDialog closed with unexpected code:{dialogCode}"
+                    assert dialogCode == QDialog.Rejected, f"SetCentDialog closed with unexpected code:{dialogCode}"
 
     def drawPerpendiculars(self):
         """
@@ -1926,7 +1926,7 @@ class QuadrantFoldingGUI(QMainWindow):
             self.display_points = None
             self.resetStatusbar()
 
-    def adjustAngleBtnClicked(self):
+    def setAngleBtnClicked(self):
         if self.quadFold:
             start_img = self.quadFold.start_img
             curr_img = self.quadFold.orig_img
@@ -1935,7 +1935,7 @@ class QuadrantFoldingGUI(QMainWindow):
             transform = self.quadFold.info.get("transform")
 
             if (start_img is not None) and (curr_img is not None) and center and (angle_to_origin is not None) and (transform is not None):
-                self.adjustAngleDialog = AdjustAngleDialog(self,
+                self.setAngleDialog = SetAngleDialog(self,
                     start_img.copy(),
                     curr_img.copy(),
                     center,
@@ -1945,16 +1945,16 @@ class QuadrantFoldingGUI(QMainWindow):
                     vmin=self.spminInt.value(),
                     vmax=self.spmaxInt.value()
                 )
-                dialogCode = self.adjustAngleDialog.exec()
+                dialogCode = self.setAngleDialog.exec()
 
-                # print(f"adjustAngleDialog dialogCode: {dialogCode}")
+                # print(f"setAngleDialog dialogCode: {dialogCode}")
 
                 if dialogCode == QDialog.Accepted:
-                    angle = self.adjustAngleDialog.get_angle()
-                    self.setAngle(angle, "AdjustAngleDialog")
+                    angle = self.setAngleDialog.get_angle()
+                    self.setAngle(angle, "SetAngleDialog")
                     self.processImage()
                 else:
-                    assert dialogCode == QDialog.Rejected, f"AdjustAngleDialog closed with unexpected code:{dialogCode}"
+                    assert dialogCode == QDialog.Rejected, f"SetAngleDialog closed with unexpected code:{dialogCode}"
 
 
     def calibrationClicked(self):
@@ -4419,6 +4419,9 @@ class QuadrantFoldingGUI(QMainWindow):
 
                 if success:
                     self.centralWidget.setMinimumSize(700, 500)
+            else:
+                # If the user presses Cancel, it returns a null string "".
+                break
 
     def saveSettings(self):
         """

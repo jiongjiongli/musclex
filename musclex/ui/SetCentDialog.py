@@ -57,7 +57,7 @@ from PySide6.QtCore import Qt
 from .DoubleZoomViewer import DoubleZoom
 
 
-class AdjustCentDialog(QDialog):
+class SetCentDialog(QDialog):
     def __init__(self,
                 parent,
                 img,
@@ -68,7 +68,7 @@ class AdjustCentDialog(QDialog):
         ):
         super().__init__()
         self.setModal(True)
-        self.setWindowTitle("Adjust Center")
+        self.setWindowTitle("Set Center")
         self.img = img
         self.center = center
         self.isLogScale = isLogScale
@@ -202,6 +202,9 @@ class AdjustCentDialog(QDialog):
         self.imgZoomOutBtn = QPushButton("Full")
         self.doubleZoom = QCheckBox("Double Zoom")
 
+        self.doubleZoomText = QLabel("In Double Zoom mode, click a point in the image. Then, click the same point in the double zoom region to mark the center location.")
+        self.doubleZoomText.setWordWrap(True)
+
         self.dispOptLayoutRowIndex = 0
         self.dispOptLayout.addWidget(self.minIntLabel, self.dispOptLayoutRowIndex, 0, 1, 2)
         self.dispOptLayout.addWidget(self.maxIntLabel, self.dispOptLayoutRowIndex, 2, 1, 2)
@@ -215,6 +218,8 @@ class AdjustCentDialog(QDialog):
         self.dispOptLayout.addWidget(self.imgZoomOutBtn, self.dispOptLayoutRowIndex, 2, 1, 2)
         self.dispOptLayoutRowIndex += 1
         self.dispOptLayout.addWidget(self.doubleZoom, self.dispOptLayoutRowIndex, 0, 1, 4)
+        self.dispOptLayoutRowIndex += 1
+        self.dispOptLayout.addWidget(self.doubleZoomText, self.dispOptLayoutRowIndex, 0, 1, 4)
         self.dispOptLayoutRowIndex += 1
 
         self.optionsLayout.addWidget(self.displayOptGrpBx)

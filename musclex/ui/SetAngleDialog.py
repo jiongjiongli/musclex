@@ -54,7 +54,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 
-class AdjustAngleDialog(QDialog):
+class SetAngleDialog(QDialog):
     def __init__(self,
                 parent,
                 start_img,
@@ -68,7 +68,7 @@ class AdjustAngleDialog(QDialog):
         ):
         super().__init__()
         self.setModal(True)
-        self.setWindowTitle("Adjust Angle")
+        self.setWindowTitle("Set Angle")
         self.start_img = start_img
         self.img = img
         self.center = center
