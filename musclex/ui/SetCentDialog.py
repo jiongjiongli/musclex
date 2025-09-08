@@ -227,18 +227,28 @@ class SetCentDialog(QDialog):
         self.optionsLayout.addWidget(self.setCenterGroup)
         self.optionsLayout.addStretch()
 
-        self.imageLayout.addWidget(self.imageCanvas)
+        self.scrollAreaImg = QScrollArea()
+        self.scrollAreaImg.setWidgetResizable(True)
+        self.imageLayout.addWidget(self.scrollAreaImg)
+        # self.imageLayout.addWidget(self.imageCanvas)
+        self.scrollAreaImg.setWidget(self.imageCanvas)
 
-        self.scroll_areaImg = QScrollArea()
-        self.imageLayout.addWidget(self.scroll_areaImg)
+        self.scrollAreaImg.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.scrollAreaImg.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-        self.scroll_areaImg.setWidgetResizable(True)
 
-        self.frameOfKeys = QFrame()
-        self.frameOfKeys.setFixedWidth(500)
-        self.frameOfKeys.setLayout(self.optionsLayout)
-        self.scroll_areaImg.setWidget(self.frameOfKeys)
-        self.scroll_areaImg.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.imageLayout.addLayout(self.optionsLayout)
+
+        # self.scroll_areaImg = QScrollArea()
+        # self.imageLayout.addWidget(self.scroll_areaImg)
+
+        # self.scroll_areaImg.setWidgetResizable(True)
+
+        # self.frameOfKeys = QFrame()
+        # self.frameOfKeys.setFixedWidth(500)
+        # self.frameOfKeys.setLayout(self.optionsLayout)
+        # self.scroll_areaImg.setWidget(self.frameOfKeys)
+        # self.scroll_areaImg.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         # self.mainLayout.addLayout(self.outputLayout)
         self.mainLayout.addWidget(self.buttonBox)
@@ -248,7 +258,7 @@ class SetCentDialog(QDialog):
         self.doubleZoomGUI = DoubleZoom(self.imageFigure, dontShowMessage=True)
 
         # pixels
-        # self.imageCanvas.setMinimumSize(800, 600)
+        self.imageCanvas.setMinimumSize(800, 600)
         # self.imageCanvas.setSizePolicy(
         #     QSizePolicy.Expanding, QSizePolicy.Expanding
         # )
@@ -517,7 +527,7 @@ class SetCentDialog(QDialog):
                 norm=Normalize(vmin=self.vmin, vmax=self.vmax),
             )
 
-        self.imageFigure.tight_layout()
+        # self.imageFigure.tight_layout()
         self.imageCanvas.draw()
 
 
@@ -527,7 +537,7 @@ class SetCentDialog(QDialog):
             ax.set_xlim(img_zoom[0])
             ax.set_ylim(img_zoom[1])
 
-        self.imageFigure.tight_layout()
+        # self.imageFigure.tight_layout()
         self.imageCanvas.draw_idle()
 
     def refreshCenter(self, updateText=False):
@@ -549,7 +559,7 @@ class SetCentDialog(QDialog):
             # self.xOutput.setText(f"{x:.2f}")
             # self.yOutput.setText(f"{y:.2f}")
 
-        self.imageFigure.tight_layout()
+        # self.imageFigure.tight_layout()
         self.imageCanvas.draw_idle()
 
     def updateCenterFromInput(self):
