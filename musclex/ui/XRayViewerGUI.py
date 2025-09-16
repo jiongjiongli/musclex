@@ -43,6 +43,7 @@ from ..CalibrationSettings import CalibrationSettings
 from .pyqt_utils import *
 from .LogTraceViewer import LogTraceViewer
 from .DoubleZoomGUI import DoubleZoom
+from .ImageNavWidget import ImageNavWidget
 import threading
 from PySide6.QtCore import QTimer
 
@@ -96,6 +97,13 @@ class XRayViewerGUI(QMainWindow):
 
         self.doubleZoomGUI = DoubleZoom(self.imageFigure)
 
+        # Wire nav widget signals
+        self.navWidget.imageChanged.connect(self._navImageChanged)
+        self.navWidget.requestProcessCurrent.connect(self._processCurrentRequested)
+        self.navWidget.requestProcessCurrentH5.connect(self._processCurrentH5Requested)
+        self.navWidget.requestProcessAll.connect(self._processAllRequested)
+        self.navWidget.requestPause.connect(self._pauseRequested)
+
         self.browseFile()
 
     def initUI(self):
@@ -143,11 +151,15 @@ class XRayViewerGUI(QMainWindow):
         self.selectImageButton.setFixedWidth(300)
 
         self.verImgLayout.addWidget(self.selectImageButton)
+        # Reusable navigation widget for unified browsing
+        self.navWidget = ImageNavWidget(showProcessing=True, parent=self)
+        self.verImgLayout.addWidget(self.navWidget)
         self.imageFigure = plt.figure()
         self.imageAxes = self.imageFigure.add_subplot(111)
+        # Create canvas and assign parent explicitly to avoid floating window
         self.imageCanvas = FigureCanvas(self.imageFigure)
-
-        self.imageCanvas.setHidden(True)
+        self.imageCanvas.setParent(self.leftWidget)
+        self.imageCanvas.hide()
         self.imageTabLayout.addWidget(self.leftWidget)
         self.imageTabLayout.addWidget(self.imageCanvas)
 
@@ -1662,48 +1674,56 @@ class XRayViewerGUI(QMainWindow):
 
     def onNewFileSelected(self, newFile):
         """
-        Preprocess folder of the file and process current image
-        :param newFile: full name of selected file
+        Delegate to the navigation widget for immediate display + background scan
         """
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        # Immediate display of the chosen file without waiting for a full directory scan
-        try:
-            sel_dir, sel_name = os.path.split(str(newFile))
-        except Exception:
-            sel_dir, sel_name = ("", str(newFile))
-        self.filePath = sel_dir
-        base, ext = os.path.splitext(sel_name)
-        if ext.lower() in ('.h5', '.hdf5'):
-            disp = base + '_00001' + ext
-            self.imgList = [disp]
-            self.fileList = [self.imgList, [("h5", os.path.join(self.filePath, sel_name), 0)]]
+        self.navWidget.loadPathOrFile(str(newFile))
+
+    def _navImageChanged(self, displayName, loaderSpec):
+        # Sync internal lists from nav widget
+        imgList, specs = self.navWidget.getListing()
+        self.imgList = imgList
+        self.fileList = [imgList, specs]
+        self.numberOfFiles, provisional = self.navWidget.getCount()
+        self._provisionalCount = provisional
+        self.filePath = self.navWidget._dirPath
+        if displayName in self.imgList:
+            self.currentFileNumber = self.imgList.index(displayName)
         else:
-            self.imgList = [sel_name]
-            self.fileList = [self.imgList, [("tiff", os.path.join(self.filePath, sel_name))]]
-
-        self.currentFileNumber = 0
+            self.currentFileNumber = 0
+        # Build XRayViewer with lazy spec
         self.ext = '.mixed'
-        self.numberOfFiles = len(self.imgList)
-        self._provisionalCount = True
+        self.h5List = []
+        self.setH5Mode(displayName)
+        self.xrayViewer = XRayViewer(self.filePath, displayName, self.fileList, self.ext)
+        self.csv_manager = XV_CSVManager(self.filePath)
+        self.selectImageButton.setHidden(True)
+        # keep hidden; nav widget provides preview
+        self.imageCanvas.hide()
+        self.updateLeftWidgetWidth()
+        self.tabWidget.setTabEnabled(1, True)
+        self.onImageChanged()
 
-        if self.filePath is not None and self.imgList is not None and self.imgList:
-            fileName = self.imgList[self.currentFileNumber]
-            self.h5List = []
-            self.setH5Mode(str(newFile))
-            self.xrayViewer = XRayViewer(self.filePath, fileName, self.fileList, self.ext)
-            self.csv_manager = XV_CSVManager(self.filePath)
-            self.selectImageButton.setHidden(True)
-            self.imageCanvas.setHidden(False)
-            self.updateLeftWidgetWidth()
-            self.tabWidget.setTabEnabled(1, True)
+    def _processCurrentRequested(self, displayName, loaderSpec):
+        # Reuse existing onImageChanged state
+        self.onImageChanged()
+
+    def _processCurrentH5Requested(self, h5Path):
+        # Jump file selection to the first frame of this h5
+        base = os.path.splitext(os.path.basename(h5Path))[0]
+        target = None
+        for name in self.imgList:
+            if name.startswith(base + '_'):
+                target = name
+                break
+        if target is not None:
+            self.currentFileNumber = self.imgList.index(target)
             self.onImageChanged()
-            # Background scan to populate the full directory listing
-            self._scan_result = None
-            self._scan_thread = threading.Thread(target=self._doScanDir, args=(self.filePath,))
-            self._scan_thread.daemon = True
-            self._scan_thread.start()
-            self._scan_timer.start()
-        QApplication.restoreOverrideCursor()
+
+    def _processAllRequested(self):
+        self.processFolder()
+
+    def _pauseRequested(self):
+        self.stop_process = True
             
 
     def setH5Mode(self, file_name):
