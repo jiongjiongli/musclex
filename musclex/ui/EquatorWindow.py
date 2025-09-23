@@ -3605,8 +3605,12 @@ class EquatorWindow(QMainWindow):
         print("thread done")
                     
     def startNextTask(self):
+        if self.currentTask is not None:
+            return
         if not self.tasksQueue.empty():
             print("starting new task")
+            # Reserve to prevent concurrent starts
+            self.currentTask = object()
             bioImg, settings, paramInfo = self.tasksQueue.get()
             
             if settings['find_oritation']:
