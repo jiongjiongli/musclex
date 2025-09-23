@@ -52,7 +52,7 @@ from .BlankImageSettings import BlankImageSettings
 from .ImageMaskTool import ImageMaskerWindow
 from .DoubleZoomGUI import DoubleZoom
 from skimage.morphology import binary_dilation
-from PySide6.QtCore import QRunnable, QThreadPool, QEventLoop, Signal
+from PySide6.QtCore import QRunnable, QThreadPool, QEventLoop, Signal, QTimer
 from queue import Queue
 
 class WorkerSignals(QObject):
@@ -3638,8 +3638,7 @@ class EquatorWindow(QMainWindow):
         if self.first:
             self.init_logging()
             self.first = False
-        else:
-            self.startNextTask()
+        QTimer.singleShot(0, self.startNextTask)
 
     def setLeftStatus(self, s):
         """
