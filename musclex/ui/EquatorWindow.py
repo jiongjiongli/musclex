@@ -130,6 +130,7 @@ class EquatorWindow(QMainWindow):
         
         self.gap_lines = []
         self.gaps = []
+        self.lastFinishedBioImg = None
 
         self.initUI()  # Initial all UI
 
@@ -1187,6 +1188,8 @@ class EquatorWindow(QMainWindow):
         """
         Triggered when Quadrant fold toggle is checked
         """
+        if self.syncUI:
+            return
         if self.quadrantFoldCheckbx.isChecked():
             self.bioImg.quadrant_folded = True
             self.bioImg.initialImgDim = self.bioImg.orig_img.shape
@@ -3600,8 +3603,14 @@ class EquatorWindow(QMainWindow):
     def thread_done(self, bioImg):
         self.tasksDone += 1
         self.progressBar.setValue(100. / len(self.imgList) * self.tasksDone)
-        #self.refreshStatusbar()
-        self.bioImg = bioImg
+        # Keep finished image separate; only adopt if it matches current expected file
+        self.lastFinishedBioImg = bioImg
+        try:
+            expected = self.imgList[self.currentImg] if self.imgList else None
+        except Exception:
+            expected = None
+        if expected is not None and getattr(bioImg, 'filename', None) == expected:
+            self.bioImg = bioImg
         print("thread done")
                     
     def startNextTask(self):
@@ -3624,17 +3633,25 @@ class EquatorWindow(QMainWindow):
             self.progressBar.setVisible(False)
         
     def onProcessingFinished(self):
+        # Prefer finished image for write/update, but do not flip self.bioImg globally
+        finishedImg = self.lastFinishedBioImg if self.lastFinishedBioImg is not None else self.bioImg
+        prevBio = self.bioImg
+        self.bioImg = finishedImg
         self.updateParams()
-        self.csvManager.writeNewData(self.bioImg)
-        self.csvManager.writeNewData2(self.bioImg)
+        self.csvManager.writeNewData(finishedImg)
+        self.csvManager.writeNewData2(finishedImg)
+        # Prevent UI re-entrant processing while syncing
+        self.syncUI = True
         self.resetUI()
         self.refreshStatusbar()
         self.quadrantFoldCheckbx.setChecked(self.bioImg.quadrant_folded)
+        self.syncUI = False
         QApplication.restoreOverrideCursor()
         self.tabWidget.tabBar().setEnabled(True)
         self.tabWidget.tabBar().setToolTip("")
-        
         self.currentTask = None
+        # restore previous
+        self.bioImg = prevBio
         if self.first:
             self.init_logging()
             self.first = False
