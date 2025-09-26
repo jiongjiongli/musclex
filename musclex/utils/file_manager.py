@@ -33,6 +33,9 @@ import fabio
 #from ..ui.pyqt_utils import *
 from .hdf5_manager import loadFile
 from PySide6.QtWidgets import QMessageBox
+from concurrent.futures import ProcessPoolExecutor
+import hashlib
+import time
 
 input_types = ['adsc', 'cbf', 'edf', 'fit2d', 'mar345', 'marccd', 'hdf5', 'h5', 'pilatus', 'tif', 'tiff', 'smv']
 
@@ -85,94 +88,62 @@ def getMaskOnly(path):
 
 def getImgFiles(fullname, headless=False):
     """
-    Get directory, all image file names in the same directory and current file index
-    :param fullname: full name of the file including directory i.e. /aaa/bbb/ccc/ddd.tif (str)
-    :return: directory (str), list of image file names, and current index i.e /aaa/bbb/ccc, ["ddd.tif","eee.tif"], 0
+    Get directory, all image-like entries in the same directory and current file index.
+    Directory may contain TIFFs, single-image HDF5, and multi-image HDF5.
+    Returns a unified list of display names and a parallel list of lazy loader specs.
+    :param fullname: absolute path to a file selected by user
+    :return: (dir_path, imgList, current, fileList, ext)
+             - dir_path: directory string
+             - imgList: sorted list of display names (strings)
+             - current: index of the selected entry in imgList
+             - fileList: [imgList, loader_specs]
+                   loader_specs contains tuples describing how to load on demand:
+                     ("tiff", abs_path)
+                     ("h5", abs_path, frame_index)
+             - ext: '.mixed' to indicate unified mixed-mode
     """
-    dir_path, filename = split(str(fullname)) # split directory and file name from full file name
+    dir_path, filename = split(str(fullname))
     dir_path = str(dir_path)
     filename = str(filename)
-    _, ext = os.path.splitext(str(filename))
-    current = 0
-    failedcases = []
-    filename_index = None
+    _, selected_ext = os.path.splitext(str(filename))
 
-    if ext == ".txt":
+    # Collect optional filter from a .txt list
+    failedcases = [] if selected_ext == ".txt" else None
+    if failedcases is not None:
         for line in open(fullname, "r"):
             failedcases.append(line.rstrip('\n'))
-    else:
-        failedcases = None
 
-    if ext in ('.hdf5', '.h5'):
-        fileList = loadFile(fullname)
-        imgList = []
-        if fileList is None or not fileList or None in fileList:
-            infMsg = QMessageBox()
-            infMsg.setText('Error opening file: ' + fullname)
-            infMsg.setInformativeText("File is not a valid HDF5 file or corrupted.")
-            infMsg.setStandardButtons(QMessageBox.Ok)
-            infMsg.setIcon(QMessageBox.Information)
-            infMsg.exec_()
-            return None, None, None, None, None
-        for f in fileList[0]:
-            if failedcases is not None and f not in failedcases:
-                continue
-            imgList.append(f)
-        if len(imgList) == 1 and not headless:
-            # if only one image in the h5 file, take all the single h5 images in the folder
-            infMsg = QMessageBox()
-            infMsg.setText('Single Image H5 File')
-            infMsg.setInformativeText("The H5 file selected contains only one image. All the H5 files in the current folder containing only one image will be regrouped the same way as a folder containing TIF files.\n")
-            infMsg.setStandardButtons(QMessageBox.Ok)
-            infMsg.setIcon(QMessageBox.Information)
-            infMsg.exec_()
-            list_h5_files = os.listdir(dir_path)
-            imgList = []
-            fileList = [[],[]]
-            for f in list_h5_files:
-                _, ext2 = os.path.splitext(str(f))
-                full_file_name = fullPath(dir_path, f)
-                if ext2 in ('.hdf5', '.h5'):
-                    file_loader = loadFile(full_file_name)
-                    if file_loader[0] is None:
-                        infMsg = QMessageBox()
-                        infMsg.setText('Error opening file: ' + f)
-                        infMsg.setInformativeText("File is not a valid HDF5 file, is corrupted, or is an empty HDF5 Master file.  Skipping.")
-                        infMsg.setStandardButtons(QMessageBox.Ok)
-                        infMsg.setIcon(QMessageBox.Information)
-                        infMsg.exec_()
-                        continue
-                    if len(file_loader[0]) == 1:
-                        if failedcases is not None and file_loader[0][0] not in failedcases:
-                            continue
-                        imgList.append(file_loader[0][0])
-                        fileList[0].append(file_loader[0][0])
-                        fileList[1].append(file_loader[1][0])
-                        if full_file_name == fullname:
-                            filename_index = file_loader[0][0]
-            imgList.sort()
-    else:
-        fileList = os.listdir(dir_path)
-        imgList = []
-        for f in fileList:
-            if failedcases is not None and f not in failedcases:
-                continue
-            full_file_name = fullPath(dir_path, f)
-            _, ext2 = os.path.splitext(str(f))
-            if isImg(full_file_name) and f != "calibration.tif" and ext2 not in ('.hdf5', '.h5'):  #and validateImage(full_file_name):
-                imgList.append(f)
-        imgList.sort()
+    # Fast path: immediate imgList/specs from cache+parallel scan
+    imgList, loader_specs = scan_directory_images_cached(dir_path, failedcases)
 
-    if failedcases is None and imgList:
-        if ext in ('.hdf5', '.h5'):
-            if filename_index is None:
-                current = 0
+    # Determine current index based on the selected file
+    current = 0
+    if imgList:
+        if selected_ext.lower() in ('.hdf5', '.h5'):
+            # If user picked an HDF5, prefer master if data/master pair exists
+            base, ext = os.path.splitext(filename)
+            if "_data_" in base:
+                prefix = base.split("_data_")[0]
+                master_base = f"{prefix}_master"
+                preferred = f"{master_base}_00001{ext}"
             else:
-                current = imgList.index(filename_index)
+                preferred = f"{base}_00001{ext}"
+            if preferred in imgList:
+                current = imgList.index(preferred)
+            else:
+                # fallback: first entry with same base
+                same = [i for i, n in enumerate(imgList) if n.startswith(base + '_') and n.endswith(ext)]
+                current = same[0] if same else 0
         else:
-            current = imgList.index(filename)
-    
-    return dir_path, imgList, current, fileList, ext
+            # Plain images match by original file name
+            if filename in imgList:
+                current = imgList.index(filename)
+            else:
+                current = 0
+
+    # Return unified structure; ext is mixed to disable H5-only GUI affordances
+    fileList = [imgList, loader_specs]
+    return dir_path, imgList, current, fileList, '.mixed'
 
 def fullPath(filePath, fileName):
     """
@@ -239,3 +210,175 @@ def createFolder(path):
     """
     if not exists(path):
         os.makedirs(path)
+
+# --------------------- Fast, cached, multiprocessing directory scan ---------------------
+_SCAN_CACHE = {}
+
+def _dir_signature(dir_path):
+    try:
+        entries = []
+        with os.scandir(dir_path) as it:
+            for e in it:
+                if e.is_file():
+                    try:
+                        stat = e.stat()
+                        entries.append((e.name, stat.st_size, int(stat.st_mtime)))
+                    except Exception:
+                        # best-effort; skip entries we cannot stat
+                        continue
+        entries.sort()
+        h = hashlib.sha256()
+        for name, sz, mt in entries:
+            h.update(name.encode('utf-8', errors='ignore'))
+            h.update(str(sz).encode())
+            h.update(str(mt).encode())
+        return h.hexdigest()
+    except Exception:
+        return None
+
+def _h5_nframes(path):
+    try:
+        f = fabio.open(path)
+        n = getattr(f, 'nframes', 1)
+        try:
+            f.close()
+        except Exception:
+            pass
+        return n
+    except Exception:
+        return 0
+
+def scan_directory_images_cached(dir_path, failedcases=None, max_workers=None):
+    """
+    Scan a directory for TIFF and HDF5 images and return unified (imgList, loader_specs).
+    Uses a cache keyed by directory content signature. HDF5 frame counts are computed
+    in parallel using processes. Frames are NOT loaded.
+    """
+    sig = _dir_signature(dir_path)
+    if sig is not None and dir_path in _SCAN_CACHE and _SCAN_CACHE[dir_path][0] == sig:
+        return _SCAN_CACHE[dir_path][1]
+
+    entries = []
+    h5_files = []
+
+    try:
+        file_names = os.listdir(dir_path)
+    except Exception:
+        return [], []
+
+    for f in file_names:
+        if failedcases is not None and f not in failedcases:
+            continue
+        full_file_name = fullPath(dir_path, f)
+        base, ext = os.path.splitext(f)
+        if f == "calibration.tif":
+            continue
+        if ext.lower() in ('.hdf5', '.h5'):
+            h5_files.append((base, ext, full_file_name))
+        elif isImg(full_file_name) and ext.lower() not in ('.hdf5', '.h5'):
+            entries.append((f, ("tiff", full_file_name)))
+
+    # Filter out data HDF5 files if a corresponding master exists
+    if h5_files:
+        master_prefix_to_record = {}
+        for base, ext, path in h5_files:
+            if base.endswith('_master'):
+                prefix = base[:-7]
+                master_prefix_to_record[prefix] = (base, ext, path)
+
+        filtered_h5 = []
+        for base, ext, path in h5_files:
+            if '_data_' in base:
+                prefix = base.split('_data_')[0]
+                if prefix in master_prefix_to_record:
+                    # Skip data file because master exists
+                    continue
+            filtered_h5.append((base, ext, path))
+        h5_files = filtered_h5
+
+    # Count HDF5 frames in parallel
+    if h5_files:
+        if max_workers is None:
+            try:
+                max_workers = max(2, min(8, os.cpu_count() or 2))
+            except Exception:
+                max_workers = 2
+        with ProcessPoolExecutor(max_workers=max_workers) as pool:
+            paths = [p for _, _, p in h5_files]
+            nframes_list = list(pool.map(_h5_nframes, paths))
+        for (base, ext, path), nframes in zip(h5_files, nframes_list):
+            if nframes <= 0:
+                continue
+            if nframes == 1:
+                disp = f"{base}_00001{ext}"
+                entries.append((disp, ("h5", path, 0)))
+            else:
+                for i in range(nframes):
+                    disp = f"{base}_{i+1:05d}{ext}"
+                    entries.append((disp, ("h5", path, i)))
+
+    entries.sort(key=lambda x: x[0])
+    imgList = [n for n, _ in entries]
+    specs = [s for _, s in entries]
+
+    if sig is not None:
+        _SCAN_CACHE[dir_path] = (sig, (imgList, specs))
+
+    return imgList, specs
+
+# --------------------- Reusable helpers for GUI provisional selection ---------------------
+def build_provisional_selection(fullname):
+    """
+    Build a provisional selection from a single chosen file for immediate GUI display.
+    Returns a tuple compatible with getImgFiles, but without scanning the whole directory:
+      (dir_path, imgList, current_index, fileList, ext)
+
+    - For HDF5, creates a pseudo-display name like base_00001.ext and a loader spec ("h5", path, 0)
+    - For TIFF and other supported images, uses the filename and a loader spec ("tiff", path)
+    - ext is set to '.mixed' to indicate unified mixed-mode
+    """
+    dir_path, sel_name = split(str(fullname))
+    dir_path = str(dir_path)
+    sel_name = str(sel_name)
+    base, ext = os.path.splitext(sel_name)
+
+    if ext.lower() in ('.h5', '.hdf5'):
+        # If selected a data file and a matching master exists, pivot to master
+        if "_data_" in base:
+            prefix = base.split("_data_")[0]
+            master_name = f"{prefix}_master{ext}"
+            master_path = os.path.join(dir_path, master_name)
+            if os.path.exists(master_path):
+                sel_name = master_name
+                base = f"{prefix}_master"
+        disp = f"{base}_00001{ext}"
+        imgList = [disp]
+        loader_specs = [("h5", os.path.join(dir_path, sel_name), 0)]
+    else:
+        imgList = [sel_name]
+        loader_specs = [("tiff", os.path.join(dir_path, sel_name))]
+
+    current = 0
+    fileList = [imgList, loader_specs]
+    return dir_path, imgList, current, fileList, '.mixed'
+
+def async_scan_directory(dir_path, on_done):
+    """
+    Start a background scan of a directory using scan_directory_images_cached and invoke
+    on_done(imgList, specs) when finished. Returns the Thread object.
+
+    Note: on_done may be executed on a non-GUI thread; if using Qt, marshal back to the main
+    thread (e.g., via signals/QTimer) before touching widgets.
+    """
+    import threading
+
+    def _worker():
+        imgList, specs = scan_directory_images_cached(dir_path)
+        try:
+            on_done(imgList, specs)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    return t
